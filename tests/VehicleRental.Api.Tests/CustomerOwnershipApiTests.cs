@@ -247,7 +247,12 @@ public class CustomerOwnershipApiTests : ApiTestBase
 
         var vehicle = await alice.Client.PostJsonAsync("/api/v1/vehicles", new
         {
-            registrationNumber = "EVIL-1", make = "A", model = "B", year = 2020, vehicleType = "Car", dailyRate = 1
+            registrationNumber = "EVIL-1",
+            make = "A",
+            model = "B",
+            year = 2020,
+            vehicleType = "Car",
+            dailyRate = 1
         });
         var customer = await alice.Client.PostJsonAsync("/api/v1/customers", new { customerNumber = "EVIL", name = "Evil" });
 

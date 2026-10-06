@@ -1,4 +1,4 @@
-﻿# Normalise line endings: Git stores LF, working tree uses the platform default.
+# Normalise line endings: Git stores LF, working tree uses the platform default.
 * text=auto
 
 # Source and project files are text.
@@ -23,3 +23,5 @@ Dockerfile text eol=lf
 .dockerignore text eol=lf
 compose.yaml text eol=lf
 *.ps1     text
+.env.example text eol=lf
+*.py      text eol=lf

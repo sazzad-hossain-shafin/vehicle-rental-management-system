@@ -102,7 +102,6 @@ Planned work, none of which exists yet:
 
 - Refresh tokens, email verification and password reset
 - Booking and availability checking
-- CI
 - Frontend (later)
 
 ## Running Locally
@@ -251,9 +250,19 @@ docker compose down -v           # DESTRUCTIVE: also deletes the database volume
 
 `docker compose ps` shows `healthy` for `postgres` (`pg_isready`) and `api` (`/health`: database reachable and migrated). `/health/live` only reports that the process is running. For common problems (missing secrets, a stopped engine, port conflicts, password changes) see [docs/docker.md](docs/docker.md#troubleshooting).
 
+## Continuous integration
+
+The repository contains a GitHub Actions workflow ([.github/workflows/ci.yml](.github/workflows/ci.yml)) that runs on pull requests and on pushes to `main`:
+
+- **Quality checks**: repository hygiene, whitespace formatting, and a NuGet vulnerability check (fails on High/Critical).
+- **Build and test**: Release build with warnings as errors, then all tests against a PostgreSQL 17 service container, including the database-backed ones. The run fails if any test is skipped.
+- **Docker**: builds the images, starts the Compose stack with throwaway secrets and runs `scripts/smoke-test.sh`.
+
+The workflow only reads the repository and needs no secrets. Details, the local equivalents of each step and the limitations are in [docs/ci.md](docs/ci.md).
+
 ## Project Status
 
-Active portfolio redevelopment. The platform has a working, tested, authenticated HTTP API on PostgreSQL. It has a Docker Compose development environment, but no frontend or CI yet.
+Active portfolio redevelopment. The platform has a working, tested, authenticated HTTP API on PostgreSQL. It has a Docker Compose development environment and a continuous integration workflow, but no frontend yet.
 
 ## License
 
