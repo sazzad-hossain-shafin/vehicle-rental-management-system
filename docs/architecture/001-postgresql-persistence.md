@@ -38,3 +38,7 @@ Until now all data lived in memory and disappeared when the console app exited. 
 - A PostgreSQL server is needed to run the app. The model and migration tests run without one; the integration tests run when `VEHICLERENTAL_TEST_CONNECTION` points at a server.
 - Application tests still use in-memory fakes, kept in the test project, so they stay fast and need no database.
 - Docker (a ready-made local database) and the API's dependency injection are planned for later phases.
+
+## Later updates
+
+The Docker environment and the API's dependency injection mentioned above were added afterwards: see [ADR 002](002-docker-development-environment.md) and [ADR 003](003-authentication-and-authorization.md). The decisions in this record are unchanged.

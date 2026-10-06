@@ -1,4 +1,4 @@
-﻿# Authentication and authorization
+# Authentication and authorization
 
 How the API knows who you are and what you may do. Framework details are in the ASP.NET Core documentation; this page covers the choices made here.
 
@@ -6,11 +6,11 @@ How the API knows who you are and what you may do. Framework details are in the 
 
 ```
 POST /api/v1/auth/login  {email, password}
-        â”‚
-        â–¼
+        |
+        v
 ASP.NET Core Identity checks the password hash and lockout
-        â”‚
-        â–¼
+        |
+        v
 200  { accessToken: "<JWT>", tokenType: "Bearer", expiresAtUtc: "...", user: {...} }
 
 GET /api/v1/anything-protected

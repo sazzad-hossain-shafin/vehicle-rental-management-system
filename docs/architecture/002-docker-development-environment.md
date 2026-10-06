@@ -37,3 +37,7 @@ A documented `docker compose run` command alone was rejected because it would ma
 - The only requirement to run the stack is a running Docker engine.
 - The setup is for local development. Production needs TLS, secret management and a deployment pipeline, none of which exist yet.
 - Changing `POSTGRES_PASSWORD` after the volume exists has no effect on the database (PostgreSQL reads it only when it creates the volume), which the troubleshooting section documents.
+
+## Later updates
+
+A GitHub Actions workflow now builds, tests and smoke-tests this Compose stack (see [CI](../ci.md)). It does not change the decisions above, and deployment and production secret management still do not exist.

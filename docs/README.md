@@ -1,11 +1,27 @@
 # Documentation
 
-Supporting documentation for the project:
+Start with the [project README](../README.md) for an overview and the Docker quick start.
 
-- [API guide](api.md): routes, conventions, paging and error responses of the HTTP API.
-- [Authentication and authorization](authentication.md): sign-in, roles, the access matrix, customer ownership and secret configuration.
+## Using and running
+
 - [Running with Docker](docker.md): the Compose environment, configuration, migrations, health checks and troubleshooting.
-- [Continuous integration](ci.md): what the GitHub Actions workflow checks, its policies, and how to run each check locally.
-- [Architecture decision records](architecture/): short notes on significant technical decisions and why they were made.
+- [Local development without Docker](development.md): running the API, console client and tests with the .NET SDK and your own PostgreSQL.
+- [API guide](api.md): routes, conventions, paging and error responses.
+- [Authentication and authorization](authentication.md): sign-in, roles, the access matrix, customer ownership and secrets.
 
-Architecture diagrams, ER diagrams and screenshots will be added here as the project evolves.
+## Architecture
+
+- [Architecture overview](architecture/overview.md): layers, dependency direction, the running system and CI at a glance.
+- Decision records:
+  - [ADR 001: PostgreSQL persistence](architecture/001-postgresql-persistence.md)
+  - [ADR 002: Docker development environment](architecture/002-docker-development-environment.md)
+  - [ADR 003: Authentication, authorization and ownership](architecture/003-authentication-and-authorization.md)
+
+## Quality and delivery
+
+- [Continuous integration](ci.md): what the GitHub Actions workflow checks, its policies, and how to run each check locally.
+
+## Maintainers
+
+- [Publication checklist](publication-checklist.md): the steps for publishing the repository safely, including what to do once the first CI run exists.
+- [Screenshots](screenshots.md): which screenshots would help and how to capture them without leaking personal data.
