@@ -102,7 +102,7 @@ Planned work, none of which exists yet:
 
 - Refresh tokens, email verification and password reset
 - Booking and availability checking
-- Docker and CI
+- CI
 - Frontend (later)
 
 ## Running Locally
@@ -149,7 +149,7 @@ The API will not start without a token signing key. Create a random one and keep
 
 ```bash
 dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/VehicleRental.Api
-# PowerShell: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+# PowerShell: $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
 ```
 
 Optionally create a first admin account at startup (needed to create staff accounts; the password must be strong):
@@ -190,10 +190,72 @@ dotnet test VehicleRentalManagementSystem.slnx
 
 Without that variable, those tests are skipped and the rest of the suite still runs.
 
+## Running with Docker
+
+Docker Compose starts PostgreSQL, applies the database migrations and runs the API with one command, with no .NET SDK or database installed. It is an alternative to the local workflow above, not a replacement. This is a local development setup: there is no TLS, reverse proxy or cloud deployment. Details: [docs/docker.md](docs/docker.md).
+
+```
+Client --HTTP :8080--> api container --> Application / Domain / Infrastructure
+                                              |
+                                  postgres container --> named volume "pgdata"
+              (migrate container: applies the schema once, then exits)
+```
+
+### Prerequisites
+
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) (or another engine) with Compose v2, **with the engine running**.
+
+### Quick start
+
+```bash
+# 1. Create .env with random secrets (never committed)
+powershell -File scripts/init-env.ps1     # Windows
+bash scripts/init-env.sh                  # Linux, macOS, Git Bash
+
+# 2. Build and start PostgreSQL, the migration job and the API
+docker compose up --build -d
+
+# 3. Check
+docker compose ps
+curl http://localhost:8080/health
+```
+
+Then open <http://localhost:8080/scalar/v1> for the interactive API reference (`/openapi/v1.json` for the raw document), sign in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your `.env`, and use **Authorize** to paste the token. `bash scripts/smoke-test.sh` exercises the running stack end to end.
+
+### Environment variables
+
+Set in `.env` (copy `.env.example`, or run the init script). **`POSTGRES_PASSWORD` and `JWT_SIGNING_KEY` are required and have no default**: Compose refuses to start without them, and the API still refuses weak signing keys. `ADMIN_EMAIL` and `ADMIN_PASSWORD` optionally create the first admin on first start. Optional: `POSTGRES_DB`, `POSTGRES_USER`, `JWT_ISSUER`, `JWT_AUDIENCE`, `ASPNETCORE_ENVIRONMENT` (`Development` by default, which serves the API docs; `Production` hides them), `API_PORT`, `POSTGRES_HOST_PORT`. Never commit `.env`.
+
+### Database migration
+
+The API never changes the schema on its own. A separate one-shot `migrate` service applies the EF Core migrations after PostgreSQL is healthy and before the API starts, and it only applies what is missing, so it is safe on every start. Run it by itself with `docker compose run --rm migrate`. If it fails, the API does not start.
+
+### Starting and stopping
+
+```bash
+docker compose up --build -d     # start (rebuild after code changes)
+docker compose logs -f api       # follow the API logs
+docker compose stop              # stop, keeping containers
+docker compose down              # stop and remove containers. Your data is KEPT (named volume)
+```
+
+### Resetting the local database
+
+```bash
+docker compose down -v           # DESTRUCTIVE: also deletes the database volume
+```
+
+`down -v` permanently deletes every vehicle, customer, rental and account in your local database. Plain `docker compose down` does not.
+
+### Health checks and troubleshooting
+
+`docker compose ps` shows `healthy` for `postgres` (`pg_isready`) and `api` (`/health`: database reachable and migrated). `/health/live` only reports that the process is running. For common problems (missing secrets, a stopped engine, port conflicts, password changes) see [docs/docker.md](docs/docker.md#troubleshooting).
+
 ## Project Status
 
-Active portfolio redevelopment. The platform has a working, tested, authenticated HTTP API on PostgreSQL. It has no frontend, Docker setup or CI yet.
+Active portfolio redevelopment. The platform has a working, tested, authenticated HTTP API on PostgreSQL. It has a Docker Compose development environment, but no frontend or CI yet.
 
 ## License
 
 Released under the [MIT License](LICENSE).
+

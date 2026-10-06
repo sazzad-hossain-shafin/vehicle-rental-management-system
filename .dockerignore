@@ -1,0 +1,21 @@
+# The build context is an allow-list: everything is excluded unless it is listed below.
+# That keeps secrets, history and local files out of the image build by default.
+**
+
+# What the API and migration images need
+!dotnet-tools.json
+!src/**
+
+# Even inside src/, never send build output, local settings or secrets
+**/bin
+**/obj
+**/.vs
+**/.idea
+**/*.user
+**/appsettings.Local.json
+**/secrets.json
+**/.env
+**/.env.*
+
+# The console client is not part of either image
+src/VehicleRental.Console

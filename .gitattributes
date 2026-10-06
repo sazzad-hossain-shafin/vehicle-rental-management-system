@@ -16,3 +16,10 @@
 *.jpeg    binary
 *.gif     binary
 *.pdf     binary
+
+# Files that run on Linux (inside containers or in bash) must keep LF endings, even when checked out on Windows.
+*.sh      text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+compose.yaml text eol=lf
+*.ps1     text

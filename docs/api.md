@@ -6,6 +6,8 @@ Most endpoints need a signed-in account (a JWT bearer token), and what you may d
 
 ## Running it
 
+The quickest way is Docker Compose, which starts PostgreSQL, applies the migrations and runs the API: see [docker.md](docker.md). To run it directly with the .NET SDK instead:
+
 ```bash
 # one-time: store the connection string (also used by the console app) and create the schema
 dotnet user-secrets set "ConnectionStrings:VehicleRentalDatabase" \

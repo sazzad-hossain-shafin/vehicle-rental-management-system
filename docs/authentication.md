@@ -1,4 +1,4 @@
-# Authentication and authorization
+﻿# Authentication and authorization
 
 How the API knows who you are and what you may do. Framework details are in the ASP.NET Core documentation; this page covers the choices made here.
 
@@ -6,11 +6,11 @@ How the API knows who you are and what you may do. Framework details are in the 
 
 ```
 POST /api/v1/auth/login  {email, password}
-        │
-        ▼
+        â”‚
+        â–¼
 ASP.NET Core Identity checks the password hash and lockout
-        │
-        ▼
+        â”‚
+        â–¼
 200  { accessToken: "<JWT>", tokenType: "Bearer", expiresAtUtc: "...", user: {...} }
 
 GET /api/v1/anything-protected
@@ -110,7 +110,7 @@ How a customer is kept to their own data:
 ```bash
 # a random signing key, stored in user secrets (not in the repository)
 dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/VehicleRental.Api
-# PowerShell:  [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+# PowerShell:  $b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)
 
 # optional: create an initial admin at startup (the password must satisfy the password rules)
 dotnet user-secrets set "Seed:Admin:Email" "admin@example.test" --project src/VehicleRental.Api
@@ -139,3 +139,4 @@ Authentication and authorization failures are Problem Details like every other e
 - **No rate limiting** beyond account lockout. Lockout can be used to lock a victim's account out for 15 minutes.
 - **Customer self-service is read-only.** Booking, and customers starting their own rentals, belong to a later phase.
 - The signing key is symmetric (HMAC), so every service that verifies tokens holds the secret. A multi-service setup would move to asymmetric keys.
+
