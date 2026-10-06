@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/VehicleRental.Console/VehicleRental.Console.csproj" />
+    <Project Path="src/VehicleRental.Domain/VehicleRental.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VehicleRental.Domain.Tests/VehicleRental.Domain.Tests.csproj" />
   </Folder>
 </Solution>
