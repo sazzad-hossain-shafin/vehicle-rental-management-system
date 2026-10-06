@@ -6,7 +6,7 @@ This project began as an object-oriented programming exercise and is now being i
 
 ## Current Version
 
-The repository contains a dedicated domain library, a unit test project and a temporary console client that exercises the domain. The console application keeps all data in memory, so nothing is saved between runs. It starts with three sample vehicles:
+The repository contains a domain library, an application layer with use-case services, automated tests and a temporary console client. All data is held in memory, so nothing is saved between runs. The console starts with three sample vehicles:
 
 | ID | Vehicle | Type | Daily rate |
 |----|---------|------|-----------|
@@ -25,36 +25,50 @@ Through a text menu, the console client can:
 - Return a rented vehicle
 - Show the rental history for the current session
 
-The domain library provides:
+**Domain layer** (`VehicleRental.Domain`)
 
-- **Validated entities.** Vehicles, customers and rentals reject invalid data (empty IDs, non-positive rates, unreasonable years, invalid dates).
-- **Separate state models.** Vehicle availability (`Available`, `Rented`) is tracked apart from the rental lifecycle (`Active`, `Completed`), and invalid transitions are rejected.
-- **Rental dates.** Each rental has a start date, an expected return date and an actual return date. A rental is billed per calendar day, counting the start day but not the return day, with a minimum of one day.
-- **Stable pricing history.** The agreed price is calculated when a rental starts and stored on the rental, so later pricing changes never alter past rentals.
-- **Strategy-based pricing.** Normal pricing, a 10% promotional discount and a 20% long-term discount (rentals of 7 days or more). A pricing policy decides which one applies, and the long-term discount always takes priority over the promotion.
+- Validated entities: vehicles, customers and rentals reject invalid data.
+- Separate state models: vehicle availability (`Available`, `Rented`) is tracked apart from the rental lifecycle (`Active`, `Completed`), and invalid transitions are rejected.
+- Rental dates: a rental is billed per calendar day, counting the start day but not the return day, with a minimum of one day.
+- Stable pricing history: the agreed price is calculated when a rental starts and stored on the rental.
+- Strategy-based pricing: normal pricing, a 10% promotional discount and a 20% long-term discount (rentals of 7 days or more). A pricing policy decides which one applies, and the long-term discount always takes priority over the promotion.
+
+**Application layer** (`VehicleRental.Application`)
+
+- Use-case services for vehicles, customers and rentals, returning read-only DTOs instead of domain entities.
+- Repository abstractions (`IVehicleRepository`, `ICustomerRepository`, `IRentalRepository`) and a unit-of-work abstraction, all asynchronous with cancellation support.
+- Customer reuse: renting with a known customer ID reuses that customer. The same ID with a different name is rejected rather than overwriting the stored name.
+- Unique vehicle IDs, and at most one active rental per vehicle.
+- Clear error types for not-found and conflict cases.
+- Temporary in-memory repositories, which will be replaced by a database.
 
 ## Current Architecture
 
 - C# on .NET 10
-- `VehicleRental.Domain`: entities, enums and pricing, with no dependency on the console or any framework
-- `VehicleRental.Console`: a temporary console client that references the domain
-- `VehicleRental.Domain.Tests`: xUnit tests for the domain
 - Strategy Pattern for pricing (`IVehiclePricingStrategy` and its implementations)
+- Dependencies point inward:
 
 ```
-VehicleRental.Console  -->  VehicleRental.Domain  <--  VehicleRental.Domain.Tests
+VehicleRental.Console  -->  VehicleRental.Application  -->  VehicleRental.Domain
 ```
+
+| Project | Role |
+|---------|------|
+| `src/VehicleRental.Domain` | Entities, enums and pricing rules. No framework dependencies. |
+| `src/VehicleRental.Application` | Use cases, repository abstractions, DTOs, temporary in-memory repositories. |
+| `src/VehicleRental.Console` | Temporary text-based client. Reads input and prints results only. |
+| `tests/VehicleRental.Domain.Tests` | xUnit tests for the domain. |
+| `tests/VehicleRental.Application.Tests` | xUnit tests for the application layer. |
 
 ## Development Roadmap
 
 Planned work, none of which exists yet:
 
-- Application layer (use cases)
-- More automated testing, including integration tests
-- EF Core persistence
+- EF Core persistence with a relational database
 - ASP.NET Core Web API
 - Authentication and authorization
 - Booking and availability checking
+- Integration tests
 - Docker and CI
 - Frontend (later)
 
@@ -70,7 +84,7 @@ dotnet run --project src/VehicleRental.Console
 
 ## Project Status
 
-Active portfolio redevelopment. The application is still a console prototype on a redesigned domain model, and the platform described in the roadmap is not built yet.
+Active portfolio redevelopment. The application is still a console prototype, now built on separate domain and application layers. There is no database or web API yet.
 
 ## License
 

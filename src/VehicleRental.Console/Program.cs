@@ -1,21 +1,32 @@
-using VehicleRental.Domain.Entities;
+using VehicleRental.Application.Abstractions;
+using VehicleRental.Application.Exceptions;
+using VehicleRental.Application.InMemory;
+using VehicleRental.Application.Rentals;
+using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Enums;
-using VehicleRental.Domain.Pricing;
 
 namespace VehicleRental.ConsoleApp;
 
 /// <summary>
-/// Temporary console client. It reads input and prints results; vehicle,
-/// customer, rental and pricing rules all come from the Domain project.
+/// Temporary console client. It reads input, calls the Application services and
+/// prints the results. It holds no data and applies no business rules.
 /// </summary>
 public class Program
 {
     private const string Separator = "----------------------------------------------";
 
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
-        var store = new InMemoryRentalStore();
-        AddSampleVehicles(store);
+        // Composition root: the only place that chooses the (temporary) in-memory storage.
+        var unitOfWork = new InMemoryUnitOfWork();
+        var vehicleRepository = new InMemoryVehicleRepository();
+        var customerRepository = new InMemoryCustomerRepository();
+        var rentalRepository = new InMemoryRentalRepository();
+
+        var vehicles = new VehicleService(vehicleRepository, unitOfWork);
+        var rentals = new RentalService(vehicleRepository, customerRepository, rentalRepository, unitOfWork);
+
+        await SampleData.SeedVehiclesAsync(vehicles);
 
         bool running = true;
 
@@ -37,27 +48,27 @@ public class Program
                 switch (choice)
                 {
                     case "1":
-                        ShowAvailableVehicles(store);
+                        await ShowAvailableVehiclesAsync(vehicles);
                         break;
 
                     case "2":
-                        SearchVehicles(store);
+                        await SearchVehiclesAsync(vehicles);
                         break;
 
                     case "3":
-                        FilterVehicles(store);
+                        await FilterVehiclesAsync(vehicles);
                         break;
 
                     case "4":
-                        RentVehicle(store);
+                        await RentVehicleAsync(vehicles, rentals);
                         break;
 
                     case "5":
-                        ReturnVehicle(store);
+                        await ReturnVehicleAsync(rentals);
                         break;
 
                     case "6":
-                        ShowRentalHistory(store);
+                        await ShowRentalHistoryAsync(rentals);
                         break;
 
                     case "7":
@@ -70,18 +81,14 @@ public class Program
                         break;
                 }
             }
-            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            catch (Exception ex) when (ex is NotFoundException
+                                          or ConflictException
+                                          or ArgumentException
+                                          or InvalidOperationException)
             {
                 Console.WriteLine($"\nError: {ex.Message}");
             }
         }
-    }
-
-    private static void AddSampleVehicles(InMemoryRentalStore store)
-    {
-        store.AddVehicle(new Vehicle("1", "Toyota", "Corolla", 2022, VehicleType.Car, 60m));
-        store.AddVehicle(new Vehicle("2", "Honda", "CB500", 2021, VehicleType.Motorcycle, 40m));
-        store.AddVehicle(new Vehicle("3", "Toyota", "HiAce", 2021, VehicleType.Van, 90m));
     }
 
     private static void ShowMenu()
@@ -99,18 +106,20 @@ public class Program
         Console.WriteLine("==============================================");
     }
 
-    private static void ShowAvailableVehicles(InMemoryRentalStore store)
+    private static async Task ShowAvailableVehiclesAsync(VehicleService vehicles)
     {
+        var available = await vehicles.SearchAsync(
+            new VehicleSearchCriteria(Availability: VehicleAvailabilityStatus.Available));
+
         Console.WriteLine("\nAvailable Vehicles:");
 
-        foreach (Vehicle vehicle in store.Vehicles
-                     .Where(v => v.AvailabilityStatus == VehicleAvailabilityStatus.Available))
+        foreach (VehicleDto vehicle in available)
         {
             Console.WriteLine(DescribeVehicle(vehicle));
         }
     }
 
-    private static void SearchVehicles(InMemoryRentalStore store)
+    private static async Task SearchVehiclesAsync(VehicleService vehicles)
     {
         Console.Write("\nEnter vehicle type (Car, Motorcycle, Van): ");
 
@@ -120,10 +129,10 @@ public class Program
             return;
         }
 
-        ShowSearchResults(store.FindByType(type));
+        ShowSearchResults(await vehicles.SearchAsync(new VehicleSearchCriteria(VehicleType: type)));
     }
 
-    private static void FilterVehicles(InMemoryRentalStore store)
+    private static async Task FilterVehiclesAsync(VehicleService vehicles)
     {
         Console.Write("\nEnter maximum daily rate: $");
 
@@ -135,21 +144,19 @@ public class Program
             return;
         }
 
-        ShowSearchResults(store.FindByMaximumRate(maxRate));
+        ShowSearchResults(await vehicles.SearchAsync(new VehicleSearchCriteria(MaximumDailyRate: maxRate)));
     }
 
-    private static void RentVehicle(InMemoryRentalStore store)
+    private static async Task RentVehicleAsync(VehicleService vehicles, RentalService rentals)
     {
-        ShowAvailableVehicles(store);
+        await ShowAvailableVehiclesAsync(vehicles);
 
         Console.Write("\nEnter vehicle ID: ");
-        Vehicle? vehicle = store.FindVehicle(Console.ReadLine() ?? "");
+        string vehicleId = Console.ReadLine() ?? "";
 
-        if (vehicle is null)
-        {
-            Console.WriteLine("Vehicle not found.");
-            return;
-        }
+        // Checked up front only so the user is not asked for details of an unrentable vehicle;
+        // the rental service enforces availability itself.
+        VehicleDto vehicle = await vehicles.GetByIdAsync(vehicleId);
 
         if (vehicle.AvailabilityStatus != VehicleAvailabilityStatus.Available)
         {
@@ -173,71 +180,53 @@ public class Program
         Console.Write("Enter customer name: ");
         string customerName = Console.ReadLine() ?? "";
 
-        var customer = new Customer(customerId, customerName);
+        bool promotionRequested = AskForPromotion(rentals, days);
 
-        DateOnly startDate = DateOnly.FromDateTime(DateTime.Today);
-        DateOnly returnDate = startDate.AddDays(days);
-
-        bool promotionRequested = AskForPromotion(days);
-        IVehiclePricingStrategy strategy = PricingPolicy.SelectStrategy(days, promotionRequested);
-
-        Rental rental = Rental.Start(customer, vehicle, startDate, returnDate, strategy);
-        store.AddRental(rental);
+        RentalDto rental = await rentals.StartRentalAsync(
+            new StartRentalRequest(vehicleId, customerId, customerName, days, promotionRequested));
 
         Console.WriteLine($"\n{Separator}");
         Console.WriteLine("                RENTAL SUMMARY");
         Console.WriteLine(Separator);
-        Console.WriteLine($"Customer: {rental.Customer.Name}");
-        Console.WriteLine($"Vehicle: {rental.Vehicle.DisplayName}");
-        Console.WriteLine($"Vehicle Type: {rental.Vehicle.VehicleType}");
+        Console.WriteLine($"Customer: {rental.CustomerName}");
+        Console.WriteLine($"Vehicle: {rental.VehicleDisplayName}");
+        Console.WriteLine($"Vehicle Type: {rental.VehicleType}");
         Console.WriteLine($"Rental Period: {rental.StartDate:yyyy-MM-dd} to {rental.ExpectedReturnDate:yyyy-MM-dd}");
         Console.WriteLine($"Rental Days: {rental.BillableDays}");
         Console.WriteLine($"Pricing: {rental.PricingDescription}");
         Console.WriteLine($"Total Cost: ${rental.TotalCost:0.00}");
-        Console.WriteLine($"Status: {rental.Vehicle.AvailabilityStatus}");
+        Console.WriteLine($"Status: {rental.Status}");
         Console.WriteLine(Separator);
         Console.WriteLine("Rental completed successfully.");
     }
 
-    private static void ReturnVehicle(InMemoryRentalStore store)
+    private static async Task ReturnVehicleAsync(RentalService rentals)
     {
         Console.Write("\nEnter vehicle ID to return: ");
-        Vehicle? vehicle = store.FindVehicle(Console.ReadLine() ?? "");
+        string vehicleId = Console.ReadLine() ?? "";
 
-        if (vehicle is null)
-        {
-            Console.WriteLine("Vehicle not found.");
-            return;
-        }
+        RentalDto rental = await rentals.ReturnVehicleAsync(vehicleId);
 
-        Rental? rental = store.FindActiveRental(vehicle);
-
-        if (rental is null)
-        {
-            Console.WriteLine("This vehicle is not currently rented.");
-            return;
-        }
-
-        rental.Complete(DateOnly.FromDateTime(DateTime.Today));
-
-        Console.WriteLine($"{vehicle.DisplayName} has been returned successfully.");
+        Console.WriteLine($"{rental.VehicleDisplayName} has been returned successfully.");
     }
 
-    private static void ShowRentalHistory(InMemoryRentalStore store)
+    private static async Task ShowRentalHistoryAsync(RentalService rentals)
     {
+        var history = await rentals.GetRentalHistoryAsync();
+
         Console.WriteLine("\nRental History:");
 
-        if (store.Rentals.Count == 0)
+        if (history.Count == 0)
         {
             Console.WriteLine("No rental records found.");
             return;
         }
 
-        foreach (Rental rental in store.Rentals)
+        foreach (RentalDto rental in history)
         {
             Console.WriteLine(
-                $"{rental.Customer.Name} - " +
-                $"{rental.Vehicle.DisplayName} - " +
+                $"{rental.CustomerName} - " +
+                $"{rental.VehicleDisplayName} - " +
                 $"{rental.BillableDays} days - " +
                 $"${rental.TotalCost:0.00} - " +
                 $"{rental.PricingDescription} - " +
@@ -246,14 +235,13 @@ public class Program
     }
 
     /// <summary>
-    /// Asks about the promotion only when the domain says one can be offered.
+    /// Asks about the promotion only when the application says one can be offered.
     /// </summary>
-    private static bool AskForPromotion(int days)
+    private static bool AskForPromotion(RentalService rentals, int days)
     {
-        if (!PricingPolicy.IsPromotionalDiscountAvailable(days))
+        if (!rentals.IsPromotionalDiscountAvailable(days))
         {
-            Console.WriteLine(
-                $"Long-term pricing applies to rentals of {PricingPolicy.LongTermThresholdDays} days or more.");
+            Console.WriteLine("Long-term pricing will be applied to this rental.");
             return false;
         }
 
@@ -277,7 +265,7 @@ public class Program
                && Enum.TryParse(name, ignoreCase: true, out type);
     }
 
-    private static void ShowSearchResults(IReadOnlyList<Vehicle> vehicles)
+    private static void ShowSearchResults(IReadOnlyList<VehicleDto> vehicles)
     {
         if (vehicles.Count == 0)
         {
@@ -287,12 +275,12 @@ public class Program
 
         Console.WriteLine("\nSearch Results:");
 
-        foreach (Vehicle vehicle in vehicles)
+        foreach (VehicleDto vehicle in vehicles)
         {
             Console.WriteLine($"{DescribeVehicle(vehicle)} - {vehicle.AvailabilityStatus}");
         }
     }
 
-    private static string DescribeVehicle(Vehicle vehicle) =>
+    private static string DescribeVehicle(VehicleDto vehicle) =>
         $"{vehicle.Id}. {vehicle.DisplayName} ({vehicle.Year}) - {vehicle.VehicleType} - ${vehicle.DailyRate}/day";
 }
