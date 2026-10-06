@@ -89,7 +89,8 @@ public class PricingStrategyTests
     public void Names_DescribeEachStrategy()
     {
         Assert.Equal("Normal pricing", new NormalPricingStrategy().Name);
-        Assert.Contains("10%", new DiscountPricingStrategy().Name);
-        Assert.Contains("20%", new LongTermPricingStrategy().Name);
+        // Exact text, because the name is stored on the rental and must not vary with the machine's culture.
+        Assert.Equal("Promotional discount (10%)", new DiscountPricingStrategy().Name);
+        Assert.Equal("Long-term discount (20%)", new LongTermPricingStrategy().Name);
     }
 }

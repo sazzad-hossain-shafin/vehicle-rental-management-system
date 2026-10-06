@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace VehicleRental.Domain.Pricing;
 
 /// <summary>
@@ -10,6 +12,13 @@ public abstract class PricingStrategyBase : IVehiclePricingStrategy
 
     /// <summary>The fraction taken off the standard cost, for example 0.10 for 10%.</summary>
     protected abstract decimal DiscountRate { get; }
+
+    /// <summary>
+    /// The discount as text, for example "10%". Formatted with the invariant culture because the name is
+    /// stored on the rental, so it must not depend on the culture of the machine that happens to run the code.
+    /// </summary>
+    protected string DiscountPercentText =>
+        (DiscountRate * 100m).ToString("0.##", CultureInfo.InvariantCulture) + "%";
 
     public decimal CalculateCost(decimal dailyRate, int billableDays)
     {

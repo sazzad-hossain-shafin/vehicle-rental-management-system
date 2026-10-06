@@ -5,7 +5,7 @@ namespace VehicleRental.Domain.Pricing;
 /// </summary>
 public sealed class LongTermPricingStrategy : PricingStrategyBase
 {
-    public override string Name => $"Long-term discount ({DiscountRate:P0})";
+    public override string Name => $"Long-term discount ({DiscountPercentText})";
 
     protected override decimal DiscountRate => 0.20m;
 }
