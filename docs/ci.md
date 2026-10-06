@@ -51,7 +51,7 @@ docker compose down --volumes
 
 ## Limitations
 
-- The workflow has not yet run on GitHub-hosted runners; it was checked locally step by step.
+- Hosted runs use `ubuntu-latest`, which GitHub is moving to a newer Ubuntu release in late October 2026; a future image change could need small fixes.
 - The vulnerability check needs network access to NuGet's advisory data and can fail for outages (deliberately).
 - The Docker job builds on one platform (linux/amd64) and publishes no images.
 - There is no code coverage, static-analysis or end-to-end browser testing yet.

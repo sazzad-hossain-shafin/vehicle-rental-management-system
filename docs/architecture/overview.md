@@ -44,7 +44,7 @@ flowchart LR
     B["Build and test<br/>PostgreSQL service container"] --> D["Docker<br/>compose build, start, smoke test"]
 ```
 
-Quality checks and Build and test run in parallel; the Docker job starts after Build and test succeeds. See [CI](../ci.md). The workflow has been validated locally but has not yet run on GitHub-hosted runners.
+Quality checks and Build and test run in parallel; the Docker job starts after Build and test succeeds. See [CI](../ci.md). The workflow runs on GitHub-hosted runners.
 
 ## Decision records
 

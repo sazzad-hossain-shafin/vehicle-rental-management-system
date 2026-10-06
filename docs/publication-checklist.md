@@ -1,6 +1,6 @@
 # Publication checklist
 
-The steps for publishing this repository to GitHub safely. They have **not** been run: there is no remote yet. Work through them in order.
+The steps used to publish this repository to GitHub safely, kept as a reference for re-checking before any future change of visibility or history.
 
 ## 1. Before creating anything
 

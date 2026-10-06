@@ -1,5 +1,7 @@
 # Vehicle Rental Management System
 
+[![CI](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions/workflows/ci.yml)
+
 A production-style vehicle rental backend built with ASP.NET Core, EF Core and PostgreSQL. It demonstrates layered (Clean Architecture-style) design, a secured REST API with JWT authentication and role-based authorization, persistent rental history, Dockerized local development, an extensive automated test suite and a CI workflow.
 
 > The project began as a small object-oriented console application and was progressively redesigned into a layered, persistent, authenticated and containerized backend. The Git history shows each step.
@@ -11,7 +13,7 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 - **Authentication and authorization** with ASP.NET Core Identity, JWT bearer tokens, Admin/Staff/Customer roles, default-deny endpoints and customer ownership checks.
 - **585 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database.
 - **One-command local environment** with Docker Compose: PostgreSQL, a one-shot migration job and the API.
-- **CI workflow** for build, tests, vulnerability policy and Docker verification. It is committed and validated locally but has **not yet run on GitHub** (see [Continuous integration](#continuous-integration)).
+- **CI workflow** for build, tests, vulnerability policy and Docker verification. It runs on GitHub Actions on every push and pull request (see [Continuous integration](#continuous-integration)).
 
 ## Technology
 
@@ -95,9 +97,12 @@ See [ADR 001](docs/architecture/001-postgresql-persistence.md), [ADR 002](docs/a
 
 ## Quick start (Docker)
 
-Requires [Docker](https://www.docker.com/products/docker-desktop/) with Compose v2 and a running engine. No .NET SDK or database is needed. From the repository root:
+Requires [Docker](https://www.docker.com/products/docker-desktop/) with Compose v2 and a running engine. No .NET SDK or database is needed.
 
 ```bash
+git clone https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system.git
+cd vehicle-rental-management-system
+
 # 1. Create .env with freshly generated random secrets (git-ignored, never committed)
 powershell -File scripts/init-env.ps1     # Windows
 bash scripts/init-env.sh                  # Linux, macOS, Git Bash
@@ -189,7 +194,7 @@ The GitHub Actions workflow in [.github/workflows/ci.yml](.github/workflows/ci.y
 - all tests against a PostgreSQL 17 service container, failing if any test is skipped
 - the Docker images, Compose startup, migration and the HTTP smoke test
 
-**Status:** the workflow is committed and its steps have been validated locally, but it has **not yet run on GitHub-hosted runners**. No green hosted run exists yet. See [docs/ci.md](docs/ci.md).
+**Status:** the workflow runs on GitHub-hosted runners; see the badge above and the [Actions tab](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions). Its first hosted run found one real Linux-only defect (a culture-dependent pricing name), which was fixed. See [docs/ci.md](docs/ci.md).
 
 ## Repository layout
 
