@@ -1,0 +1,18 @@
+﻿# Normalise line endings: Git stores LF, working tree uses the platform default.
+* text=auto
+
+# Source and project files are text.
+*.cs      text diff=csharp
+*.csproj  text
+*.slnx    text
+*.md      text
+*.json    text
+*.yml     text
+*.yaml    text
+
+# Binary assets (screenshots, diagrams).
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.pdf     binary
