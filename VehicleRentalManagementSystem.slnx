@@ -3,9 +3,11 @@
     <Project Path="src/VehicleRental.Application/VehicleRental.Application.csproj" />
     <Project Path="src/VehicleRental.Console/VehicleRental.Console.csproj" />
     <Project Path="src/VehicleRental.Domain/VehicleRental.Domain.csproj" />
+    <Project Path="src/VehicleRental.Infrastructure/VehicleRental.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VehicleRental.Application.Tests/VehicleRental.Application.Tests.csproj" />
     <Project Path="tests/VehicleRental.Domain.Tests/VehicleRental.Domain.Tests.csproj" />
+    <Project Path="tests/VehicleRental.Infrastructure.IntegrationTests/VehicleRental.Infrastructure.IntegrationTests.csproj" />
   </Folder>
 </Solution>

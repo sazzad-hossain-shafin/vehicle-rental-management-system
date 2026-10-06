@@ -7,9 +7,11 @@ namespace VehicleRental.Application.Rentals;
 /// </summary>
 public sealed record RentalDto(
     Guid Id,
-    string CustomerId,
+    Guid CustomerId,
+    string CustomerNumber,
     string CustomerName,
-    string VehicleId,
+    Guid VehicleId,
+    string VehicleRegistrationNumber,
     string VehicleDisplayName,
     VehicleType VehicleType,
     DateOnly StartDate,

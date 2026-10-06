@@ -5,12 +5,12 @@ using VehicleRental.Domain.Entities;
 namespace VehicleRental.Application.Customers;
 
 /// <summary>
-/// The rule for matching a customer ID and name against stored customers, shared
+/// The rule for matching a customer number and name against stored customers, shared
 /// by <see cref="CustomerService"/> and the rental workflow.
 /// </summary>
 /// <remarks>
-/// An unknown ID means a new customer. A known ID with the same name (ignoring
-/// case and surrounding spaces) reuses the stored customer. A known ID with a
+/// An unknown number means a new customer. A known number with the same name (ignoring
+/// case and surrounding spaces) reuses the stored customer. A known number with a
 /// different name is a conflict: stored identity data is never overwritten.
 /// </remarks>
 internal static class CustomerResolver
@@ -19,17 +19,17 @@ internal static class CustomerResolver
     /// The customer to use, and whether it is new. A new customer has not been
     /// stored yet; the caller adds it once its own operation has succeeded.
     /// </returns>
-    /// <exception cref="ArgumentException">The ID or name is empty.</exception>
-    /// <exception cref="ConflictException">The ID belongs to a customer with a different name.</exception>
+    /// <exception cref="ArgumentException">The number or name is empty or too long.</exception>
+    /// <exception cref="ConflictException">The number belongs to a customer with a different name.</exception>
     public static async Task<(Customer Customer, bool IsNew)> ResolveAsync(
         ICustomerRepository customers,
-        string id,
+        string customerNumber,
         string name,
         CancellationToken cancellationToken)
     {
-        var candidate = new Customer(id, name);
+        var candidate = new Customer(customerNumber, name);
 
-        Customer? existing = await customers.GetByIdAsync(candidate.Id, cancellationToken);
+        Customer? existing = await customers.GetByCustomerNumberAsync(candidate.CustomerNumber, cancellationToken);
 
         if (existing is null)
         {
@@ -39,7 +39,7 @@ internal static class CustomerResolver
         if (!string.Equals(existing.Name, candidate.Name, StringComparison.OrdinalIgnoreCase))
         {
             throw new ConflictException(
-                $"Customer ID '{existing.Id}' is already registered under a different name.");
+                $"Customer number '{existing.CustomerNumber}' is already registered under a different name.");
         }
 
         return (existing, false);

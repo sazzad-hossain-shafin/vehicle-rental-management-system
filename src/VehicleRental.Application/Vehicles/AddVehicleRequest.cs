@@ -3,7 +3,7 @@ using VehicleRental.Domain.Enums;
 namespace VehicleRental.Application.Vehicles;
 
 public sealed record AddVehicleRequest(
-    string Id,
+    string RegistrationNumber,
     string Make,
     string Model,
     int Year,

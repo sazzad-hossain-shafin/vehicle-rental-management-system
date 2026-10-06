@@ -10,11 +10,64 @@ public class VehicleTests
     {
         var vehicle = new Vehicle("V1", "Honda", "CB500", 2021, VehicleType.Motorcycle, 40m);
 
-        Assert.Equal("V1", vehicle.Id);
+        Assert.Equal("V1", vehicle.RegistrationNumber);
+        Assert.NotEqual(Guid.Empty, vehicle.Id);
         Assert.Equal("Honda CB500", vehicle.DisplayName);
         Assert.Equal(VehicleType.Motorcycle, vehicle.VehicleType);
         Assert.Equal(40m, vehicle.DailyRate);
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
+    }
+
+    [Fact]
+    public void Create_GeneratesADifferentIdentifierForEachVehicle()
+    {
+        var first = TestData.CreateVehicle("V1");
+        var second = TestData.CreateVehicle("V2");
+
+        Assert.NotEqual(first.Id, second.Id);
+    }
+
+    [Theory]
+    [InlineData("  abc-123 ", "ABC-123")]
+    [InlineData("xyz 789", "XYZ 789")]
+    [InlineData("v1", "V1")]
+    public void Create_NormalizesRegistrationNumberToTrimmedUpperCase(string input, string expected)
+    {
+        var vehicle = new Vehicle(input, "Toyota", "Corolla", 2022, VehicleType.Car, 60m);
+
+        Assert.Equal(expected, vehicle.RegistrationNumber);
+    }
+
+    [Theory]
+    [InlineData("A")]
+    [InlineData("-AB")]
+    [InlineData("AB-")]
+    [InlineData("AB_123")]
+    [InlineData("AB@123")]
+    [InlineData("ABCDEFGHIJKLM")]
+    public void Create_WithInvalidRegistrationNumber_ThrowsArgumentException(string registration)
+    {
+        Assert.Throws<ArgumentException>(
+            () => new Vehicle(registration, "Toyota", "Corolla", 2022, VehicleType.Car, 60m));
+    }
+
+    [Fact]
+    public void NormalizeRegistrationNumber_HandlesNullAndWhitespace()
+    {
+        Assert.Equal("", Vehicle.NormalizeRegistrationNumber(null));
+        Assert.Equal("", Vehicle.NormalizeRegistrationNumber("   "));
+        Assert.Equal("ABC-123", Vehicle.NormalizeRegistrationNumber(" abc-123 "));
+    }
+
+    [Fact]
+    public void Create_WithMakeOrModelTooLong_ThrowsArgumentException()
+    {
+        var tooLong = new string('x', Vehicle.MakeMaxLength + 1);
+
+        Assert.Throws<ArgumentException>(
+            () => new Vehicle("V1", tooLong, "Corolla", 2022, VehicleType.Car, 60m));
+        Assert.Throws<ArgumentException>(
+            () => new Vehicle("V1", "Toyota", tooLong, 2022, VehicleType.Car, 60m));
     }
 
     [Theory]

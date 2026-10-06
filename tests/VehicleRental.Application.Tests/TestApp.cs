@@ -1,5 +1,5 @@
 using VehicleRental.Application.Customers;
-using VehicleRental.Application.InMemory;
+using VehicleRental.Application.Tests.Fakes;
 using VehicleRental.Application.Rentals;
 using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Enums;

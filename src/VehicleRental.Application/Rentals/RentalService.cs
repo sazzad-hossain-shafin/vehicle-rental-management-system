@@ -40,12 +40,17 @@ public sealed class RentalService
         PricingPolicy.IsPromotionalDiscountAvailable(rentalDays);
 
     /// <summary>
-    /// Starts a rental today. An unknown customer ID registers a new customer; a known
-    /// ID is reused if the name matches (see <see cref="CustomerResolver"/>).
+    /// Starts a rental today. An unknown customer number registers a new customer; a known
+    /// number is reused if the name matches (see <see cref="CustomerResolver"/>).
     /// </summary>
+    /// <remarks>
+    /// The vehicle, the rental and any new customer are saved together or not at all. If another
+    /// request rents the same vehicle at the same moment, exactly one of them is saved and the
+    /// other gets a <see cref="ConflictException"/> when saving.
+    /// </remarks>
     /// <exception cref="NotFoundException">The vehicle does not exist.</exception>
     /// <exception cref="ConflictException">
-    /// The vehicle is already rented, or the customer ID belongs to a different name.
+    /// The vehicle is already rented, or the customer number belongs to a different name.
     /// </exception>
     /// <exception cref="ArgumentException">The customer details or the rental length are invalid.</exception>
     public async Task<RentalDto> StartRentalAsync(
@@ -54,19 +59,19 @@ public sealed class RentalService
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        Vehicle vehicle = await GetVehicleAsync(request.VehicleId, cancellationToken);
+        Vehicle vehicle = await GetVehicleAsync(request.VehicleRegistrationNumber, cancellationToken);
 
         bool hasActiveRental =
             await _rentals.GetActiveForVehicleAsync(vehicle.Id, cancellationToken) is not null;
 
         if (hasActiveRental || vehicle.AvailabilityStatus != VehicleAvailabilityStatus.Available)
         {
-            throw new ConflictException($"Vehicle '{vehicle.Id}' is not available.");
+            throw new ConflictException($"Vehicle '{vehicle.RegistrationNumber}' is not available.");
         }
 
         var (customer, isNewCustomer) = await CustomerResolver.ResolveAsync(
             _customers,
-            request.CustomerId,
+            request.CustomerNumber,
             request.CustomerName,
             cancellationToken);
 
@@ -96,15 +101,16 @@ public sealed class RentalService
     /// Completes the vehicle's active rental, as of today, and makes the vehicle available again.
     /// </summary>
     /// <exception cref="NotFoundException">The vehicle does not exist.</exception>
-    /// <exception cref="ConflictException">The vehicle has no active rental.</exception>
+    /// <exception cref="ConflictException">The vehicle has no active rental, or it was just changed by another request.</exception>
     public async Task<RentalDto> ReturnVehicleAsync(
-        string vehicleId,
+        string vehicleRegistrationNumber,
         CancellationToken cancellationToken = default)
     {
-        Vehicle vehicle = await GetVehicleAsync(vehicleId, cancellationToken);
+        Vehicle vehicle = await GetVehicleAsync(vehicleRegistrationNumber, cancellationToken);
 
         Rental rental = await _rentals.GetActiveForVehicleAsync(vehicle.Id, cancellationToken)
-                        ?? throw new ConflictException($"Vehicle '{vehicle.Id}' is not currently rented.");
+                        ?? throw new ConflictException(
+                            $"Vehicle '{vehicle.RegistrationNumber}' is not currently rented.");
 
         rental.Complete(Today());
 
@@ -118,10 +124,10 @@ public sealed class RentalService
     /// </summary>
     /// <exception cref="NotFoundException">The vehicle does not exist.</exception>
     public async Task<RentalDto?> GetActiveRentalForVehicleAsync(
-        string vehicleId,
+        string vehicleRegistrationNumber,
         CancellationToken cancellationToken = default)
     {
-        Vehicle vehicle = await GetVehicleAsync(vehicleId, cancellationToken);
+        Vehicle vehicle = await GetVehicleAsync(vehicleRegistrationNumber, cancellationToken);
 
         Rental? rental = await _rentals.GetActiveForVehicleAsync(vehicle.Id, cancellationToken);
 
@@ -139,9 +145,11 @@ public sealed class RentalService
         return rentals.Select(r => r.ToDto()).ToList();
     }
 
-    private async Task<Vehicle> GetVehicleAsync(string vehicleId, CancellationToken cancellationToken) =>
-        await _vehicles.GetByIdAsync((vehicleId ?? "").Trim(), cancellationToken)
-        ?? throw new NotFoundException($"Vehicle '{vehicleId}' was not found.");
+    private async Task<Vehicle> GetVehicleAsync(string registrationNumber, CancellationToken cancellationToken) =>
+        await _vehicles.GetByRegistrationNumberAsync(
+            Vehicle.NormalizeRegistrationNumber(registrationNumber),
+            cancellationToken)
+        ?? throw new NotFoundException($"Vehicle '{registrationNumber}' was not found.");
 
     private DateOnly Today() =>
         DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);

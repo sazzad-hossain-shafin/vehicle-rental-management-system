@@ -2,18 +2,16 @@ using VehicleRental.Application.Abstractions;
 using VehicleRental.Domain.Entities;
 using VehicleRental.Domain.Enums;
 
-namespace VehicleRental.Application.InMemory;
+namespace VehicleRental.Application.Tests.Fakes;
 
 /// <summary>
-/// TEMPORARY in-memory storage, used until a database implementation exists. Rentals
-/// are kept in the order they were added. Results are copies, so callers cannot change
-/// the stored collection. It is not thread-safe.
+/// Test double for <see cref="IRentalRepository"/>. Rentals are returned oldest start date
+/// first, then in the order they were added. Results are copies.
 /// </summary>
-public sealed class InMemoryRentalRepository : IRentalRepository
+internal sealed class InMemoryRentalRepository : IRentalRepository
 {
     private readonly List<Rental> _rentals = new();
 
-    /// <summary>The number of stored rentals.</summary>
     public int Count => _rentals.Count;
 
     public Task<Rental?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -24,14 +22,13 @@ public sealed class InMemoryRentalRepository : IRentalRepository
     }
 
     public Task<Rental?> GetActiveForVehicleAsync(
-        string vehicleId,
+        Guid vehicleId,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         Rental? active = _rentals.FirstOrDefault(r =>
-            r.Status == RentalStatus.Active &&
-            string.Equals(r.Vehicle.Id, vehicleId, StringComparison.OrdinalIgnoreCase));
+            r.Status == RentalStatus.Active && r.Vehicle.Id == vehicleId);
 
         return Task.FromResult(active);
     }
@@ -40,7 +37,8 @@ public sealed class InMemoryRentalRepository : IRentalRepository
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult<IReadOnlyList<Rental>>(_rentals.ToList());
+        // OrderBy is stable, so rentals with the same start date stay in the order they were added.
+        return Task.FromResult<IReadOnlyList<Rental>>(_rentals.OrderBy(r => r.StartDate).ToList());
     }
 
     public Task AddAsync(Rental rental, CancellationToken cancellationToken = default)

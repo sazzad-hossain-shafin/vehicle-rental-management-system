@@ -1,18 +1,22 @@
 using VehicleRental.Application.Exceptions;
-using VehicleRental.Application.InMemory;
+using VehicleRental.Application.Tests.Fakes;
 using VehicleRental.Domain.Entities;
 using VehicleRental.Domain.Enums;
 using VehicleRental.Domain.Pricing;
 
 namespace VehicleRental.Application.Tests;
 
+/// <summary>
+/// Checks that the fake repositories keep to the contract the services rely on. The real
+/// EF Core repositories are tested against PostgreSQL in the integration tests.
+/// </summary>
 public class InMemoryRepositoryTests
 {
-    private static Vehicle NewVehicle(string id = "V1") =>
-        new(id, "Toyota", "Corolla", 2022, VehicleType.Car, 100m);
+    private static Vehicle NewVehicle(string registration = "V1") =>
+        new(registration, "Toyota", "Corolla", 2022, VehicleType.Car, 100m);
 
     [Fact]
-    public async Task VehicleRepository_AddingTheSameIdTwice_ThrowsConflictException()
+    public async Task VehicleRepository_AddingTheSameRegistrationTwice_ThrowsConflictException()
     {
         var repository = new InMemoryVehicleRepository();
         await repository.AddAsync(NewVehicle("V1"));
@@ -36,7 +40,7 @@ public class InMemoryRepositoryTests
     }
 
     [Fact]
-    public async Task CustomerRepository_AddingTheSameIdTwice_ThrowsConflictException()
+    public async Task CustomerRepository_AddingTheSameNumberTwice_ThrowsConflictException()
     {
         var repository = new InMemoryCustomerRepository();
         await repository.AddAsync(new Customer("C1", "Alice"));
@@ -56,11 +60,11 @@ public class InMemoryRepositoryTests
         var rental = Rental.Start(new Customer("C1", "Alice"), vehicle, start, start.AddDays(2), new NormalPricingStrategy());
         await repository.AddAsync(rental);
 
-        Assert.Same(rental, await repository.GetActiveForVehicleAsync("V1"));
+        Assert.Same(rental, await repository.GetActiveForVehicleAsync(vehicle.Id));
 
         rental.Complete(start.AddDays(2));
 
-        Assert.Null(await repository.GetActiveForVehicleAsync("V1"));
+        Assert.Null(await repository.GetActiveForVehicleAsync(vehicle.Id));
         Assert.Same(rental, await repository.GetByIdAsync(rental.Id));
     }
 
@@ -73,7 +77,7 @@ public class InMemoryRepositoryTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => new InMemoryVehicleRepository().GetAllAsync(cts.Token));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => new InMemoryCustomerRepository().GetByIdAsync("C1", cts.Token));
+            () => new InMemoryCustomerRepository().GetByCustomerNumberAsync("C1", cts.Token));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => new InMemoryRentalRepository().GetAllAsync(cts.Token));
     }

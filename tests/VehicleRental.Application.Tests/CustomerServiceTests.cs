@@ -11,7 +11,7 @@ public class CustomerServiceTests
     {
         var customer = await _app.Customers.RegisterOrGetAsync("C1", "Alice");
 
-        Assert.Equal("C1", customer.Id);
+        Assert.Equal("C1", customer.CustomerNumber);
         Assert.Equal("Alice", customer.Name);
         Assert.Equal(1, _app.CustomerRepository.Count);
     }
@@ -55,7 +55,7 @@ public class CustomerServiceTests
         await Assert.ThrowsAsync<ConflictException>(
             () => _app.Customers.RegisterOrGetAsync("C1", "Bob"));
 
-        var stored = await _app.Customers.GetByIdAsync("C1");
+        var stored = await _app.Customers.GetByCustomerNumberAsync("C1");
         Assert.Equal("Alice", stored.Name);
         Assert.Equal(1, _app.CustomerRepository.Count);
     }
@@ -102,7 +102,7 @@ public class CustomerServiceTests
     {
         await _app.Customers.RegisterOrGetAsync("C1", "Alice");
 
-        var customer = await _app.Customers.GetByIdAsync("C1");
+        var customer = await _app.Customers.GetByCustomerNumberAsync("C1");
 
         Assert.Equal("Alice", customer.Name);
     }
@@ -110,6 +110,6 @@ public class CustomerServiceTests
     [Fact]
     public async Task GetById_WithUnknownId_ThrowsNotFoundException()
     {
-        await Assert.ThrowsAsync<NotFoundException>(() => _app.Customers.GetByIdAsync("missing"));
+        await Assert.ThrowsAsync<NotFoundException>(() => _app.Customers.GetByCustomerNumberAsync("missing"));
     }
 }

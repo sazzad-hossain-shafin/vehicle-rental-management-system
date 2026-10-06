@@ -17,13 +17,23 @@ public class RentalServiceTests
         var rental = await _app.StartRentalAsync(days: 3);
 
         Assert.Equal(RentalStatus.Active, rental.Status);
-        Assert.Equal("V1", rental.VehicleId);
-        Assert.Equal("C1", rental.CustomerId);
+        Assert.Equal("V1", rental.VehicleRegistrationNumber);
+        Assert.Equal("C1", rental.CustomerNumber);
         Assert.Equal(TestApp.Today, rental.StartDate);
         Assert.Equal(TestApp.Today.AddDays(3), rental.ExpectedReturnDate);
         Assert.Equal(3, rental.BillableDays);
         Assert.Equal(100m, rental.DailyRateAtRental);
         Assert.Equal(300m, rental.TotalCost);
+    }
+
+    [Fact]
+    public async Task StartRental_FindsTheVehicleByRegistrationNumberInAnyCase()
+    {
+        await _app.AddVehicleAsync("ABC-123");
+
+        var rental = await _app.StartRentalAsync(vehicleId: " abc-123 ");
+
+        Assert.Equal("ABC-123", rental.VehicleRegistrationNumber);
     }
 
     [Fact]
@@ -36,7 +46,7 @@ public class RentalServiceTests
         Assert.Equal(1, _app.RentalRepository.Count);
         var active = await _app.Rentals.GetActiveRentalForVehicleAsync("V1");
         Assert.Equal(rental.Id, active?.Id);
-        var vehicle = await _app.Vehicles.GetByIdAsync("V1");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V1");
         Assert.Equal(VehicleAvailabilityStatus.Rented, vehicle.AvailabilityStatus);
     }
 
@@ -94,7 +104,7 @@ public class RentalServiceTests
 
         await Assert.ThrowsAnyAsync<ArgumentException>(() => _app.StartRentalAsync(days: days));
 
-        var vehicle = await _app.Vehicles.GetByIdAsync("V1");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V1");
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
         Assert.Equal(0, _app.RentalRepository.Count);
         Assert.Equal(0, _app.CustomerRepository.Count);
@@ -107,7 +117,7 @@ public class RentalServiceTests
 
         await Assert.ThrowsAnyAsync<ArgumentException>(() => _app.StartRentalAsync(customerName: " "));
 
-        var vehicle = await _app.Vehicles.GetByIdAsync("V1");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V1");
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
     }
 
@@ -120,7 +130,7 @@ public class RentalServiceTests
 
         await _app.StartRentalAsync(customerId: "C9", customerName: "Dana");
 
-        var customer = await _app.Customers.GetByIdAsync("C9");
+        var customer = await _app.Customers.GetByCustomerNumberAsync("C9");
         Assert.Equal("Dana", customer.Name);
         Assert.Equal(1, _app.CustomerRepository.Count);
     }
@@ -148,9 +158,9 @@ public class RentalServiceTests
         await Assert.ThrowsAsync<ConflictException>(
             () => _app.StartRentalAsync(vehicleId: "V2", customerId: "C1", customerName: "Mallory"));
 
-        var vehicle = await _app.Vehicles.GetByIdAsync("V2");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V2");
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
-        Assert.Equal("Alice", (await _app.Customers.GetByIdAsync("C1")).Name);
+        Assert.Equal("Alice", (await _app.Customers.GetByCustomerNumberAsync("C1")).Name);
     }
 
     // ----- Pricing path (rate 100/day) -----
@@ -196,7 +206,7 @@ public class RentalServiceTests
 
         Assert.Equal(RentalStatus.Completed, completed.Status);
         Assert.Equal(TestApp.Today.AddDays(2), completed.ActualReturnDate);
-        var vehicle = await _app.Vehicles.GetByIdAsync("V1");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V1");
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
         Assert.Null(await _app.Rentals.GetActiveRentalForVehicleAsync("V1"));
     }
@@ -258,7 +268,7 @@ public class RentalServiceTests
 
         var history = await _app.Rentals.GetRentalHistoryAsync();
 
-        Assert.Equal(new[] { "V1", "V2" }, history.Select(r => r.VehicleId));
+        Assert.Equal(new[] { "V1", "V2" }, history.Select(r => r.VehicleRegistrationNumber));
         Assert.Equal(new[] { RentalStatus.Completed, RentalStatus.Active }, history.Select(r => r.Status));
     }
 
@@ -307,7 +317,7 @@ public class RentalServiceTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => _app.Rentals.StartRentalAsync(
-                new(VehicleId: "V1", CustomerId: "C1", CustomerName: "Alice", RentalDays: 3),
+                new(VehicleRegistrationNumber: "V1", CustomerNumber: "C1", CustomerName: "Alice", RentalDays: 3),
                 cts.Token));
 
         Assert.Equal(0, _app.RentalRepository.Count);

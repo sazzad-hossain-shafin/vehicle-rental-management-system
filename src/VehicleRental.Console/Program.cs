@@ -1,33 +1,56 @@
+using Microsoft.Extensions.Configuration;
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Exceptions;
-using VehicleRental.Application.InMemory;
 using VehicleRental.Application.Rentals;
 using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Enums;
+using VehicleRental.Infrastructure;
 
 namespace VehicleRental.ConsoleApp;
 
 /// <summary>
-/// Temporary console client. It reads input, calls the Application services and
-/// prints the results. It holds no data and applies no business rules.
+/// Temporary console client. It reads input, calls the Application services and prints the
+/// results. It holds no data and applies no business rules; storage is PostgreSQL through the
+/// Infrastructure project.
 /// </summary>
 public class Program
 {
     private const string Separator = "----------------------------------------------";
 
-    public static async Task Main(string[] args)
+    private sealed record Services(VehicleService Vehicles, RentalService Rentals);
+
+    public static async Task<int> Main(string[] args)
     {
-        // Composition root: the only place that chooses the (temporary) in-memory storage.
-        var unitOfWork = new InMemoryUnitOfWork();
-        var vehicleRepository = new InMemoryVehicleRepository();
-        var customerRepository = new InMemoryCustomerRepository();
-        var rentalRepository = new InMemoryRentalRepository();
+        string? connectionString = LoadConnectionString();
 
-        var vehicles = new VehicleService(vehicleRepository, unitOfWork);
-        var rentals = new RentalService(vehicleRepository, customerRepository, rentalRepository, unitOfWork);
+        if (connectionString is null)
+        {
+            PrintMissingConfiguration();
+            return 1;
+        }
 
-        await SampleData.SeedVehiclesAsync(vehicles);
+        try
+        {
+            if (!await IsDatabaseReadyAsync(connectionString))
+            {
+                return 1;
+            }
 
+            await SeedSampleDataAsync(connectionString);
+            await RunMenuAsync(connectionString);
+
+            return 0;
+        }
+        catch (Exception ex)
+        {
+            // Anything not handled per command (a lost database connection, for example).
+            Console.WriteLine($"\nUnexpected error: {ex.Message}");
+            return 2;
+        }
+    }
+
+    private static async Task RunMenuAsync(string connectionString)
+    {
         bool running = true;
 
         while (running)
@@ -43,37 +66,42 @@ public class Program
                 break;
             }
 
+            if (choice == "7")
+            {
+                Console.WriteLine("\nThank you for using the system.");
+                break;
+            }
+
+            // A new database session per command, so nothing stale is kept between commands.
+            await using PersistenceSession session = PersistenceSession.Create(connectionString);
+            Services services = CreateServices(session);
+
             try
             {
                 switch (choice)
                 {
                     case "1":
-                        await ShowAvailableVehiclesAsync(vehicles);
+                        await ShowAvailableVehiclesAsync(services.Vehicles);
                         break;
 
                     case "2":
-                        await SearchVehiclesAsync(vehicles);
+                        await SearchVehiclesAsync(services.Vehicles);
                         break;
 
                     case "3":
-                        await FilterVehiclesAsync(vehicles);
+                        await FilterVehiclesAsync(services.Vehicles);
                         break;
 
                     case "4":
-                        await RentVehicleAsync(vehicles, rentals);
+                        await RentVehicleAsync(services);
                         break;
 
                     case "5":
-                        await ReturnVehicleAsync(rentals);
+                        await ReturnVehicleAsync(services.Rentals);
                         break;
 
                     case "6":
-                        await ShowRentalHistoryAsync(rentals);
-                        break;
-
-                    case "7":
-                        running = false;
-                        Console.WriteLine("\nThank you for using the system.");
+                        await ShowRentalHistoryAsync(services.Rentals);
                         break;
 
                     default:
@@ -90,6 +118,77 @@ public class Program
             }
         }
     }
+
+    private static Services CreateServices(PersistenceSession session) =>
+        new(
+            new VehicleService(session.Vehicles, session.UnitOfWork),
+            new RentalService(session.Vehicles, session.Customers, session.Rentals, session.UnitOfWork));
+
+    // ----- Configuration and startup -----
+
+    /// <summary>
+    /// Reads the connection string from user secrets, an optional git-ignored local file or the
+    /// environment (later sources win). Nothing secret is stored in the repository.
+    /// </summary>
+    private static string? LoadConnectionString()
+    {
+        IConfigurationRoot configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.Local.json", optional: true)
+            .AddUserSecrets<Program>(optional: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        string? connectionString = configuration.GetConnectionString(PersistenceSession.ConnectionStringName);
+
+        return string.IsNullOrWhiteSpace(connectionString) ? null : connectionString;
+    }
+
+    private static void PrintMissingConfiguration()
+    {
+        Console.WriteLine("No database connection string is configured.");
+        Console.WriteLine();
+        Console.WriteLine("Set 'ConnectionStrings:VehicleRentalDatabase' with user secrets (recommended):");
+        Console.WriteLine("  dotnet user-secrets set \"ConnectionStrings:VehicleRentalDatabase\" \"<connection string>\" \\");
+        Console.WriteLine("      --project src/VehicleRental.Console");
+        Console.WriteLine();
+        Console.WriteLine($"or with the {PersistenceSession.ConnectionStringEnvironmentVariable} environment variable.");
+        Console.WriteLine("See the README for the connection string format and database setup.");
+    }
+
+    private static async Task<bool> IsDatabaseReadyAsync(string connectionString)
+    {
+        await using PersistenceSession session = PersistenceSession.Create(connectionString);
+
+        switch (await session.CheckDatabaseAsync())
+        {
+            case DatabaseStatus.Ready:
+                return true;
+
+            case DatabaseStatus.MigrationsPending:
+                Console.WriteLine("The database schema is missing or out of date. Apply the migrations first:");
+                Console.WriteLine("  dotnet ef database update --project src/VehicleRental.Infrastructure");
+                Console.WriteLine($"(with the {PersistenceSession.ConnectionStringEnvironmentVariable} environment variable set)");
+                return false;
+
+            default:
+                Console.WriteLine("Could not connect to the database. Check that PostgreSQL is running and that");
+                Console.WriteLine("the connection string, database name and credentials are correct.");
+                return false;
+        }
+    }
+
+    private static async Task SeedSampleDataAsync(string connectionString)
+    {
+        await using PersistenceSession session = PersistenceSession.Create(connectionString);
+
+        if (await SampleData.SeedVehiclesAsync(CreateServices(session).Vehicles))
+        {
+            Console.WriteLine("Added the sample vehicles to the empty fleet.");
+        }
+    }
+
+    // ----- Menu actions -----
 
     private static void ShowMenu()
     {
@@ -147,16 +246,16 @@ public class Program
         ShowSearchResults(await vehicles.SearchAsync(new VehicleSearchCriteria(MaximumDailyRate: maxRate)));
     }
 
-    private static async Task RentVehicleAsync(VehicleService vehicles, RentalService rentals)
+    private static async Task RentVehicleAsync(Services services)
     {
-        await ShowAvailableVehiclesAsync(vehicles);
+        await ShowAvailableVehiclesAsync(services.Vehicles);
 
-        Console.Write("\nEnter vehicle ID: ");
-        string vehicleId = Console.ReadLine() ?? "";
+        Console.Write("\nEnter vehicle registration number: ");
+        string registrationNumber = Console.ReadLine() ?? "";
 
         // Checked up front only so the user is not asked for details of an unrentable vehicle;
         // the rental service enforces availability itself.
-        VehicleDto vehicle = await vehicles.GetByIdAsync(vehicleId);
+        VehicleDto vehicle = await services.Vehicles.GetByRegistrationNumberAsync(registrationNumber);
 
         if (vehicle.AvailabilityStatus != VehicleAvailabilityStatus.Available)
         {
@@ -174,22 +273,22 @@ public class Program
             return;
         }
 
-        Console.Write("Enter customer ID: ");
-        string customerId = Console.ReadLine() ?? "";
+        Console.Write("Enter customer number: ");
+        string customerNumber = Console.ReadLine() ?? "";
 
         Console.Write("Enter customer name: ");
         string customerName = Console.ReadLine() ?? "";
 
-        bool promotionRequested = AskForPromotion(rentals, days);
+        bool promotionRequested = AskForPromotion(services.Rentals, days);
 
-        RentalDto rental = await rentals.StartRentalAsync(
-            new StartRentalRequest(vehicleId, customerId, customerName, days, promotionRequested));
+        RentalDto rental = await services.Rentals.StartRentalAsync(
+            new StartRentalRequest(registrationNumber, customerNumber, customerName, days, promotionRequested));
 
         Console.WriteLine($"\n{Separator}");
         Console.WriteLine("                RENTAL SUMMARY");
         Console.WriteLine(Separator);
-        Console.WriteLine($"Customer: {rental.CustomerName}");
-        Console.WriteLine($"Vehicle: {rental.VehicleDisplayName}");
+        Console.WriteLine($"Customer: {rental.CustomerName} ({rental.CustomerNumber})");
+        Console.WriteLine($"Vehicle: {rental.VehicleDisplayName} ({rental.VehicleRegistrationNumber})");
         Console.WriteLine($"Vehicle Type: {rental.VehicleType}");
         Console.WriteLine($"Rental Period: {rental.StartDate:yyyy-MM-dd} to {rental.ExpectedReturnDate:yyyy-MM-dd}");
         Console.WriteLine($"Rental Days: {rental.BillableDays}");
@@ -202,10 +301,10 @@ public class Program
 
     private static async Task ReturnVehicleAsync(RentalService rentals)
     {
-        Console.Write("\nEnter vehicle ID to return: ");
-        string vehicleId = Console.ReadLine() ?? "";
+        Console.Write("\nEnter vehicle registration number to return: ");
+        string registrationNumber = Console.ReadLine() ?? "";
 
-        RentalDto rental = await rentals.ReturnVehicleAsync(vehicleId);
+        RentalDto rental = await rentals.ReturnVehicleAsync(registrationNumber);
 
         Console.WriteLine($"{rental.VehicleDisplayName} has been returned successfully.");
     }
@@ -226,7 +325,8 @@ public class Program
         {
             Console.WriteLine(
                 $"{rental.CustomerName} - " +
-                $"{rental.VehicleDisplayName} - " +
+                $"{rental.VehicleDisplayName} ({rental.VehicleRegistrationNumber}) - " +
+                $"{rental.StartDate:yyyy-MM-dd} - " +
                 $"{rental.BillableDays} days - " +
                 $"${rental.TotalCost:0.00} - " +
                 $"{rental.PricingDescription} - " +
@@ -282,5 +382,5 @@ public class Program
     }
 
     private static string DescribeVehicle(VehicleDto vehicle) =>
-        $"{vehicle.Id}. {vehicle.DisplayName} ({vehicle.Year}) - {vehicle.VehicleType} - ${vehicle.DailyRate}/day";
+        $"{vehicle.RegistrationNumber}. {vehicle.DisplayName} ({vehicle.Year}) - {vehicle.VehicleType} - ${vehicle.DailyRate}/day";
 }

@@ -17,7 +17,7 @@ public class VehicleServiceTests
         var vehicle = await _app.Vehicles.AddVehicleAsync(
             new AddVehicleRequest("V1", "Honda", "CB500", 2021, VehicleType.Motorcycle, 40m));
 
-        Assert.Equal("V1", vehicle.Id);
+        Assert.Equal("V1", vehicle.RegistrationNumber);
         Assert.Equal("Honda CB500", vehicle.DisplayName);
         Assert.Equal(VehicleAvailabilityStatus.Available, vehicle.AvailabilityStatus);
         Assert.Equal(1, _app.VehicleRepository.Count);
@@ -62,9 +62,9 @@ public class VehicleServiceTests
     {
         await _app.AddVehicleAsync("V1");
 
-        var vehicle = await _app.Vehicles.GetByIdAsync("V1");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("V1");
 
-        Assert.Equal("V1", vehicle.Id);
+        Assert.Equal("V1", vehicle.RegistrationNumber);
     }
 
     [Fact]
@@ -72,36 +72,56 @@ public class VehicleServiceTests
     {
         await _app.AddVehicleAsync("V1");
 
-        var vehicle = await _app.Vehicles.GetByIdAsync("  V1 ");
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("  V1 ");
 
-        Assert.Equal("V1", vehicle.Id);
+        Assert.Equal("V1", vehicle.RegistrationNumber);
+    }
+
+    [Fact]
+    public async Task GetByRegistrationNumber_IsCaseInsensitive()
+    {
+        await _app.AddVehicleAsync("abc-123");
+
+        var vehicle = await _app.Vehicles.GetByRegistrationNumberAsync("Abc-123");
+
+        Assert.Equal("ABC-123", vehicle.RegistrationNumber);
+    }
+
+    [Fact]
+    public async Task AddVehicle_AssignsAnInternalIdentifierSeparateFromTheRegistration()
+    {
+        var first = await _app.AddVehicleAsync("V1");
+        var second = await _app.AddVehicleAsync("V2");
+
+        Assert.NotEqual(Guid.Empty, first.Id);
+        Assert.NotEqual(first.Id, second.Id);
     }
 
     [Fact]
     public async Task GetById_WithUnknownId_ThrowsNotFoundException()
     {
-        await Assert.ThrowsAsync<NotFoundException>(() => _app.Vehicles.GetByIdAsync("missing"));
+        await Assert.ThrowsAsync<NotFoundException>(() => _app.Vehicles.GetByRegistrationNumberAsync("missing"));
     }
 
     [Fact]
-    public async Task GetAll_ReturnsEveryVehicleInTheOrderAdded()
+    public async Task GetAll_ReturnsEveryVehicleOrderedByRegistrationNumber()
     {
         await _app.AddVehicleAsync("V2");
         await _app.AddVehicleAsync("V1");
 
         var vehicles = await _app.Vehicles.GetAllAsync();
 
-        Assert.Equal(new[] { "V2", "V1" }, vehicles.Select(v => v.Id));
+        Assert.Equal(new[] { "V1", "V2" }, vehicles.Select(v => v.RegistrationNumber));
     }
 
     // ----- Search and filtering -----
 
     private async Task AddFleetAsync()
     {
-        await _app.AddVehicleAsync("1", 60m, VehicleType.Car);
-        await _app.AddVehicleAsync("2", 40m, VehicleType.Motorcycle);
-        await _app.AddVehicleAsync("3", 90m, VehicleType.Van);
-        await _app.AddVehicleAsync("4", 75m, VehicleType.Car);
+        await _app.AddVehicleAsync("V1", 60m, VehicleType.Car);
+        await _app.AddVehicleAsync("V2", 40m, VehicleType.Motorcycle);
+        await _app.AddVehicleAsync("V3", 90m, VehicleType.Van);
+        await _app.AddVehicleAsync("V4", 75m, VehicleType.Car);
     }
 
     [Fact]
@@ -111,7 +131,7 @@ public class VehicleServiceTests
 
         var cars = await _app.Vehicles.SearchAsync(new VehicleSearchCriteria(VehicleType: VehicleType.Car));
 
-        Assert.Equal(new[] { "1", "4" }, cars.Select(v => v.Id));
+        Assert.Equal(new[] { "V1", "V4" }, cars.Select(v => v.RegistrationNumber));
     }
 
     [Fact]
@@ -121,7 +141,7 @@ public class VehicleServiceTests
 
         var affordable = await _app.Vehicles.SearchAsync(new VehicleSearchCriteria(MaximumDailyRate: 60m));
 
-        Assert.Equal(new[] { "1", "2" }, affordable.Select(v => v.Id));
+        Assert.Equal(new[] { "V1", "V2" }, affordable.Select(v => v.RegistrationNumber));
     }
 
     [Fact]
@@ -132,7 +152,7 @@ public class VehicleServiceTests
         var result = await _app.Vehicles.SearchAsync(
             new VehicleSearchCriteria(VehicleType.Car, MaximumDailyRate: 70m));
 
-        Assert.Equal(new[] { "1" }, result.Select(v => v.Id));
+        Assert.Equal(new[] { "V1" }, result.Select(v => v.RegistrationNumber));
     }
 
     [Fact]
@@ -159,12 +179,12 @@ public class VehicleServiceTests
     public async Task Search_ByAvailability_ExcludesRentedVehicles()
     {
         await AddFleetAsync();
-        await _app.StartRentalAsync(vehicleId: "1");
+        await _app.StartRentalAsync(vehicleId: "V1");
 
         var available = await _app.Vehicles.SearchAsync(
             new VehicleSearchCriteria(Availability: VehicleAvailabilityStatus.Available));
 
-        Assert.Equal(new[] { "2", "3", "4" }, available.Select(v => v.Id));
+        Assert.Equal(new[] { "V2", "V3", "V4" }, available.Select(v => v.RegistrationNumber));
     }
 
     [Fact]

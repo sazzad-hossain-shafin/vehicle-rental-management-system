@@ -35,6 +35,17 @@ public class Rental
     /// <summary>The agreed total, fixed when the rental started.</summary>
     public decimal TotalCost { get; }
 
+    /// <summary>
+    /// For the persistence layer only. It bypasses validation because it is used to rebuild
+    /// rentals that were already validated and priced when they were started.
+    /// </summary>
+    private Rental()
+    {
+        Customer = null!;
+        Vehicle = null!;
+        PricingDescription = null!;
+    }
+
     private Rental(
         Customer customer,
         Vehicle vehicle,
@@ -44,7 +55,7 @@ public class Rental
         string pricingDescription,
         decimal totalCost)
     {
-        Id = Guid.NewGuid();
+        Id = Guid.CreateVersion7();
         Customer = customer;
         Vehicle = vehicle;
         StartDate = startDate;

@@ -6,10 +6,23 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>VehicleRental.ConsoleApp</RootNamespace>
+    <UserSecretsId>c4f1d3a8-6b2e-4f0a-9d57-3e8a1b7c2d94</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\VehicleRental.Application\VehicleRental.Application.csproj" />
+    <ProjectReference Include="..\VehicleRental.Infrastructure\VehicleRental.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="10.0.12" />
+  </ItemGroup>
+
+  <!-- Optional, git-ignored local settings file. Copied next to the app only if it exists. -->
+  <ItemGroup>
+    <None Update="appsettings.Local.json" Condition="Exists('appsettings.Local.json')" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

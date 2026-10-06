@@ -6,7 +6,8 @@ namespace VehicleRental.Application.Vehicles;
 /// A read-only view of a vehicle, so callers never hold the mutable domain entity.
 /// </summary>
 public sealed record VehicleDto(
-    string Id,
+    Guid Id,
+    string RegistrationNumber,
     string Make,
     string Model,
     string DisplayName,

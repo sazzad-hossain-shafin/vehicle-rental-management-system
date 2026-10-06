@@ -13,6 +13,7 @@ internal static class Mappings
     public static VehicleDto ToDto(this Vehicle vehicle) =>
         new(
             vehicle.Id,
+            vehicle.RegistrationNumber,
             vehicle.Make,
             vehicle.Model,
             vehicle.DisplayName,
@@ -22,14 +23,16 @@ internal static class Mappings
             vehicle.AvailabilityStatus);
 
     public static CustomerDto ToDto(this Customer customer) =>
-        new(customer.Id, customer.Name);
+        new(customer.Id, customer.CustomerNumber, customer.Name);
 
     public static RentalDto ToDto(this Rental rental) =>
         new(
             rental.Id,
             rental.Customer.Id,
+            rental.Customer.CustomerNumber,
             rental.Customer.Name,
             rental.Vehicle.Id,
+            rental.Vehicle.RegistrationNumber,
             rental.Vehicle.DisplayName,
             rental.Vehicle.VehicleType,
             rental.StartDate,

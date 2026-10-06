@@ -1,5 +1,6 @@
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Exceptions;
+using VehicleRental.Domain.Entities;
 
 namespace VehicleRental.Application.Customers;
 
@@ -14,27 +15,35 @@ public sealed class CustomerService
         _unitOfWork = unitOfWork;
     }
 
-    /// <exception cref="NotFoundException">No customer has this ID.</exception>
-    public async Task<CustomerDto> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    /// <exception cref="NotFoundException">No customer has this number.</exception>
+    public async Task<CustomerDto> GetByCustomerNumberAsync(
+        string customerNumber,
+        CancellationToken cancellationToken = default)
     {
-        var customer = await _customers.GetByIdAsync((id ?? "").Trim(), cancellationToken);
+        var customer = await _customers.GetByCustomerNumberAsync(
+            Customer.NormalizeCustomerNumber(customerNumber),
+            cancellationToken);
 
         return customer?.ToDto()
-               ?? throw new NotFoundException($"Customer '{id}' was not found.");
+               ?? throw new NotFoundException($"Customer '{customerNumber}' was not found.");
     }
 
     /// <summary>
-    /// Returns the customer with this ID, registering a new one if none exists.
+    /// Returns the customer with this number, registering a new one if none exists.
     /// See <see cref="CustomerResolver"/> for how an existing customer is matched.
     /// </summary>
-    /// <exception cref="ArgumentException">The ID or name is empty.</exception>
-    /// <exception cref="ConflictException">The ID belongs to a customer with a different name.</exception>
+    /// <exception cref="ArgumentException">The number or name is empty or too long.</exception>
+    /// <exception cref="ConflictException">The number belongs to a customer with a different name.</exception>
     public async Task<CustomerDto> RegisterOrGetAsync(
-        string id,
+        string customerNumber,
         string name,
         CancellationToken cancellationToken = default)
     {
-        var (customer, isNew) = await CustomerResolver.ResolveAsync(_customers, id, name, cancellationToken);
+        var (customer, isNew) = await CustomerResolver.ResolveAsync(
+            _customers,
+            customerNumber,
+            name,
+            cancellationToken);
 
         if (isNew)
         {

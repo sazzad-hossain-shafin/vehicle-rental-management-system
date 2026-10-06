@@ -1,12 +1,12 @@
 using VehicleRental.Application.Abstractions;
 
-namespace VehicleRental.Application.InMemory;
+namespace VehicleRental.Application.Tests.Fakes;
 
 /// <summary>
-/// TEMPORARY. The in-memory repositories change their collections immediately, so
-/// there is nothing to commit. A database-backed implementation will save here.
+/// Test double. The fake repositories change their collections immediately, so there is
+/// nothing to commit here.
 /// </summary>
-public sealed class InMemoryUnitOfWork : IUnitOfWork
+internal sealed class InMemoryUnitOfWork : IUnitOfWork
 {
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {

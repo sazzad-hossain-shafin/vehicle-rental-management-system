@@ -2,32 +2,33 @@ using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Exceptions;
 using VehicleRental.Domain.Entities;
 
-namespace VehicleRental.Application.InMemory;
+namespace VehicleRental.Application.Tests.Fakes;
 
 /// <summary>
-/// TEMPORARY in-memory storage, used until a database implementation exists. Vehicle
-/// IDs are unique, ignoring case. Results are copies, so callers cannot change the
-/// stored collection. It is not thread-safe.
+/// Test double for <see cref="IVehicleRepository"/>. It mirrors the contract the real EF Core
+/// repository is tested against: unique registration numbers and results ordered by
+/// registration number. Results are copies, so callers cannot change the stored collection.
 /// </summary>
-public sealed class InMemoryVehicleRepository : IVehicleRepository
+internal sealed class InMemoryVehicleRepository : IVehicleRepository
 {
     private readonly List<Vehicle> _vehicles = new();
 
-    /// <summary>The number of stored vehicles.</summary>
     public int Count => _vehicles.Count;
 
-    public Task<Vehicle?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    public Task<Vehicle?> GetByRegistrationNumberAsync(
+        string registrationNumber,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(Find(id));
+        return Task.FromResult(Find(registrationNumber));
     }
 
     public Task<IReadOnlyList<Vehicle>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult<IReadOnlyList<Vehicle>>(_vehicles.ToList());
+        return Task.FromResult<IReadOnlyList<Vehicle>>(Ordered(_vehicles));
     }
 
     public Task<IReadOnlyList<Vehicle>> SearchAsync(
@@ -53,16 +54,17 @@ public sealed class InMemoryVehicleRepository : IVehicleRepository
             query = query.Where(v => v.AvailabilityStatus == criteria.Availability);
         }
 
-        return Task.FromResult<IReadOnlyList<Vehicle>>(query.ToList());
+        return Task.FromResult<IReadOnlyList<Vehicle>>(Ordered(query));
     }
 
     public Task AddAsync(Vehicle vehicle, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (Find(vehicle.Id) is not null)
+        if (Find(vehicle.RegistrationNumber) is not null)
         {
-            throw new ConflictException($"A vehicle with ID '{vehicle.Id}' already exists.");
+            throw new ConflictException(
+                $"A vehicle with registration number '{vehicle.RegistrationNumber}' already exists.");
         }
 
         _vehicles.Add(vehicle);
@@ -70,6 +72,9 @@ public sealed class InMemoryVehicleRepository : IVehicleRepository
         return Task.CompletedTask;
     }
 
-    private Vehicle? Find(string id) =>
-        _vehicles.FirstOrDefault(v => string.Equals(v.Id, id, StringComparison.OrdinalIgnoreCase));
+    private Vehicle? Find(string registrationNumber) =>
+        _vehicles.FirstOrDefault(v => v.RegistrationNumber == registrationNumber);
+
+    private static List<Vehicle> Ordered(IEnumerable<Vehicle> vehicles) =>
+        vehicles.OrderBy(v => v.RegistrationNumber, StringComparer.Ordinal).ToList();
 }

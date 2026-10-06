@@ -16,7 +16,7 @@ public sealed class VehicleService
     }
 
     /// <exception cref="ArgumentException">The vehicle details are invalid (see <see cref="Vehicle"/>).</exception>
-    /// <exception cref="ConflictException">A vehicle with this ID already exists.</exception>
+    /// <exception cref="ConflictException">A vehicle with this registration number already exists.</exception>
     public async Task<VehicleDto> AddVehicleAsync(
         AddVehicleRequest request,
         CancellationToken cancellationToken = default)
@@ -24,16 +24,18 @@ public sealed class VehicleService
         ArgumentNullException.ThrowIfNull(request);
 
         var vehicle = new Vehicle(
-            request.Id,
+            request.RegistrationNumber,
             request.Make,
             request.Model,
             request.Year,
             request.VehicleType,
             request.DailyRate);
 
-        if (await _vehicles.GetByIdAsync(vehicle.Id, cancellationToken) is not null)
+        // A friendly early check. The database's unique index still decides a race between two requests.
+        if (await _vehicles.GetByRegistrationNumberAsync(vehicle.RegistrationNumber, cancellationToken) is not null)
         {
-            throw new ConflictException($"A vehicle with ID '{vehicle.Id}' already exists.");
+            throw new ConflictException(
+                $"A vehicle with registration number '{vehicle.RegistrationNumber}' already exists.");
         }
 
         await _vehicles.AddAsync(vehicle, cancellationToken);
@@ -42,13 +44,17 @@ public sealed class VehicleService
         return vehicle.ToDto();
     }
 
-    /// <exception cref="NotFoundException">No vehicle has this ID.</exception>
-    public async Task<VehicleDto> GetByIdAsync(string id, CancellationToken cancellationToken = default)
+    /// <exception cref="NotFoundException">No vehicle has this registration number.</exception>
+    public async Task<VehicleDto> GetByRegistrationNumberAsync(
+        string registrationNumber,
+        CancellationToken cancellationToken = default)
     {
-        var vehicle = await _vehicles.GetByIdAsync((id ?? "").Trim(), cancellationToken);
+        var vehicle = await _vehicles.GetByRegistrationNumberAsync(
+            Vehicle.NormalizeRegistrationNumber(registrationNumber),
+            cancellationToken);
 
         return vehicle?.ToDto()
-               ?? throw new NotFoundException($"Vehicle '{id}' was not found.");
+               ?? throw new NotFoundException($"Vehicle '{registrationNumber}' was not found.");
     }
 
     public async Task<IReadOnlyList<VehicleDto>> GetAllAsync(CancellationToken cancellationToken = default)
