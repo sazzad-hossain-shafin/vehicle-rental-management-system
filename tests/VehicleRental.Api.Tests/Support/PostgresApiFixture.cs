@@ -1,5 +1,12 @@
+using System.Net;
+using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using VehicleRental.Application.Accounts;
+using VehicleRental.Application.Security;
+using VehicleRental.Infrastructure.Identity;
 using VehicleRental.Infrastructure.Persistence;
 
 namespace VehicleRental.Api.Tests.Support;
@@ -18,8 +25,6 @@ public sealed class PostgresApiFixture : IAsyncLifetime
 
     internal ApiFactory Factory { get; private set; } = null!;
 
-    public HttpClient Client { get; private set; } = null!;
-
     public string ConnectionString { get; private set; } = "";
 
     public async Task InitializeAsync()
@@ -33,7 +38,6 @@ public sealed class PostgresApiFixture : IAsyncLifetime
 
         ConnectionString = await CreateDatabaseAsync(applyMigrations: true);
         Factory = new ApiFactory(ConnectionString);
-        Client = Factory.CreateClient();
     }
 
     public async Task DisposeAsync()
@@ -42,8 +46,6 @@ public sealed class PostgresApiFixture : IAsyncLifetime
         {
             return;
         }
-
-        Client?.Dispose();
 
         if (Factory is not null)
         {
@@ -86,16 +88,83 @@ public sealed class PostgresApiFixture : IAsyncLifetime
         return connectionString;
     }
 
-    /// <summary>Empties every table of the main test database.</summary>
+    /// <summary>Empties every business and account table of the main test database (the seeded roles stay).</summary>
     public async Task ResetAsync()
     {
         await using var context = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(ConnectionString));
-        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\"");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\", \"Users\" CASCADE");
+    }
+
+    // ----- Real accounts, signed in through the real login endpoint -----
+
+    /// <summary>A client with no credentials.</summary>
+    internal HttpClient CreateAnonymousClient() => Factory.CreateClient();
+
+    /// <summary>Creates a staff account and returns a client signed in as it.</summary>
+    internal async Task<HttpClient> CreateStaffClientAsync(string? email = null)
+    {
+        string address = email ?? $"staff-{Guid.NewGuid():N}@example.test";
+        string password = ApiFactory.NewPassword();
+
+        using IServiceScope scope = Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IAccountService>().CreateStaffAsync(address, password);
+
+        return await SignInAsync(address, password);
+    }
+
+    /// <summary>Creates an admin account (there is deliberately no public way to) and returns a client signed in as it.</summary>
+    internal async Task<HttpClient> CreateAdminClientAsync()
+    {
+        string address = $"admin-{Guid.NewGuid():N}@example.test";
+        string password = ApiFactory.NewPassword();
+
+        using (IServiceScope scope = Factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var admin = new ApplicationUser { Id = Guid.CreateVersion7(), UserName = address, Email = address };
+
+            Assert.True((await users.CreateAsync(admin, password)).Succeeded);
+            Assert.True((await users.AddToRoleAsync(admin, Roles.Admin)).Succeeded);
+        }
+
+        return await SignInAsync(address, password);
+    }
+
+    /// <summary>Registers a customer account through the public endpoint and returns a client signed in as it.</summary>
+    internal async Task<CustomerSession> CreateCustomerClientAsync(string name = "Casey Customer")
+    {
+        string address = $"customer-{Guid.NewGuid():N}@example.test";
+        string password = ApiFactory.NewPassword();
+
+        using HttpClient anonymous = CreateAnonymousClient();
+        var registered = await anonymous.PostJsonAsync("/api/v1/auth/register", new { email = address, password, name });
+        Assert.Equal(HttpStatusCode.Created, registered.StatusCode);
+
+        UserDto user = await registered.ReadAsync<UserDto>();
+
+        return new CustomerSession(await SignInAsync(address, password), user, address, password);
+    }
+
+    internal async Task<HttpClient> SignInAsync(string email, string password)
+    {
+        using HttpClient anonymous = CreateAnonymousClient();
+        var response = await anonymous.PostJsonAsync("/api/v1/auth/login", new { email, password });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        string token = (await response.ReadJsonAsync()).GetProperty("accessToken").GetString()!;
+
+        HttpClient client = Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        return client;
     }
 
     private static string WithDatabase(string connectionString, string database) =>
         new NpgsqlConnectionStringBuilder(connectionString) { Database = database }.ConnectionString;
 }
+
+/// <summary>A signed-in customer account and the credentials it was created with.</summary>
+internal sealed record CustomerSession(HttpClient Client, UserDto User, string Email, string Password);
 
 [CollectionDefinition(Name)]
 public sealed class PostgresApiCollection : ICollectionFixture<PostgresApiFixture>
@@ -104,19 +173,35 @@ public sealed class PostgresApiCollection : ICollectionFixture<PostgresApiFixtur
 }
 
 /// <summary>
-/// Base class for API tests that need the database: they share one database and run one at a time,
-/// each starting empty.
+/// Base class for API tests that need the database: they share one database and run one at a time, each
+/// starting empty. <see cref="Client"/> is a staff account, the account that runs the rental desk, because
+/// the business flows these tests exercise are staff operations. Tests of other roles create their own clients.
 /// </summary>
 [Collection(PostgresApiCollection.Name)]
 public abstract class ApiTestBase : IAsyncLifetime
 {
     protected ApiTestBase(PostgresApiFixture api) => Api = api;
 
-    protected PostgresApiFixture Api { get; }
+    internal PostgresApiFixture Api { get; }
 
-    protected HttpClient Client => Api.Client;
+    /// <summary>A client signed in as a staff member.</summary>
+    protected HttpClient Client { get; private set; } = null!;
 
-    public Task InitializeAsync() => TestDatabase.IsConfigured ? Api.ResetAsync() : Task.CompletedTask;
+    public async Task InitializeAsync()
+    {
+        if (!TestDatabase.IsConfigured)
+        {
+            return;
+        }
 
-    public Task DisposeAsync() => Task.CompletedTask;
+        await Api.ResetAsync();
+        Client = await Api.CreateStaffClientAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        Client?.Dispose();
+
+        return Task.CompletedTask;
+    }
 }

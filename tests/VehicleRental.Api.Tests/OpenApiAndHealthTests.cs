@@ -38,7 +38,13 @@ public class OpenApiAndHealthTests
             ("/api/v1/rentals", "post"),
             ("/api/v1/rentals", "get"),
             ("/api/v1/rentals/{id}", "get"),
-            ("/api/v1/rentals/{id}/return", "post")
+            ("/api/v1/rentals/{id}/return", "post"),
+            ("/api/v1/auth/login", "post"),
+            ("/api/v1/auth/register", "post"),
+            ("/api/v1/admin/staff", "post"),
+            ("/api/v1/me", "get"),
+            ("/api/v1/me/customer", "get"),
+            ("/api/v1/me/rentals", "get")
         };
 
         foreach (var (path, method) in expected)
@@ -108,9 +114,11 @@ public class OpenApiAndHealthTests
 
         string text = await client.GetStringAsync("/openapi/v1.json");
 
-        Assert.DoesNotContain("Host=", text);
+        Assert.DoesNotContain(factory.SigningKey, text);   // the real signing key
+        Assert.DoesNotContain("Host=", text);              // connection details
         Assert.DoesNotContain("ConnectionString", text, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Password", text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("PasswordHash", text, StringComparison.OrdinalIgnoreCase); // no Identity internals
+        Assert.DoesNotContain("SecurityStamp", text, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -130,10 +138,17 @@ public class OpenApiAndHealthTests
     public async Task DocumentationEndpoints_AreNotExposedInProduction()
     {
         await using var factory = new ApiFactory(ApiFactory.UnreachableDatabase, "Production");
-        using var client = factory.CreateClient();
+        using var signedIn = factory.CreateClientAs(VehicleRental.Application.Security.Roles.Admin);
+        using var anonymous = factory.CreateClient();
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/openapi/v1.json")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/scalar/v1")).StatusCode);
+        foreach (string path in new[] { "/openapi/v1.json", "/scalar/v1" })
+        {
+            // The routes are not mapped at all, as a signed-in caller can tell...
+            Assert.Equal(HttpStatusCode.NotFound, (await signedIn.GetAsync(path)).StatusCode);
+
+            // ...and an anonymous caller never gets the documentation either.
+            Assert.NotEqual(HttpStatusCode.OK, (await anonymous.GetAsync(path)).StatusCode);
+        }
     }
 
     // ----- Health -----

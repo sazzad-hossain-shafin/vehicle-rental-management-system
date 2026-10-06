@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using VehicleRental.Infrastructure.Persistence;
 
@@ -67,7 +67,7 @@ public sealed class PostgresFixture : IAsyncLifetime
     public async Task ResetAsync()
     {
         await using VehicleRentalDbContext context = CreateContext();
-        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\"");
+        await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\", \"Users\" CASCADE");
     }
 
     private static string WithDatabase(string connectionString, string database) =>
@@ -94,3 +94,4 @@ public abstract class DatabaseTestBase : IAsyncLifetime
 
     public Task DisposeAsync() => Task.CompletedTask;
 }
+

@@ -1,5 +1,6 @@
 using VehicleRental.Api.Contracts;
 using VehicleRental.Api.Http;
+using VehicleRental.Api.Security;
 using VehicleRental.Application.Customers;
 
 namespace VehicleRental.Api.Endpoints;
@@ -12,6 +13,7 @@ internal static class CustomerEndpoints
 
         group.MapGet("/{id}", GetCustomerAsync)
             .WithName("GetCustomerById")
+            .RequireAuthorization(Policies.CustomerManage)
             .WithSummary("Gets a customer by their ID")
             .Produces<CustomerDto>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -19,6 +21,7 @@ internal static class CustomerEndpoints
 
         group.MapGet("/by-number/{customerNumber}", GetCustomerByNumberAsync)
             .WithName("GetCustomerByNumber")
+            .RequireAuthorization(Policies.CustomerManage)
             .WithSummary("Gets a customer by their customer number")
             .WithDescription("Case-insensitive. Use the customer's ID for everything else.")
             .Produces<CustomerDto>()
@@ -26,6 +29,7 @@ internal static class CustomerEndpoints
 
         group.MapPost("/", CreateCustomerAsync)
             .WithName("CreateCustomer")
+            .RequireAuthorization(Policies.CustomerManage)
             .WithSummary("Registers a customer")
             .WithDescription("The customer number must be unique; creating the same number twice is a conflict.")
             .WithRequestValidation<CreateCustomerRequest>()

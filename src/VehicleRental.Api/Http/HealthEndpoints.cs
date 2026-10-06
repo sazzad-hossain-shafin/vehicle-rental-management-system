@@ -13,8 +13,10 @@ internal static class HealthEndpoints
     /// </summary>
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteAsync });
-        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteAsync });
+        // Anonymous on purpose: load balancers and deployment tools call these without credentials, and they
+        // reveal nothing beyond healthy or unhealthy.
+        app.MapHealthChecks("/health", new HealthCheckOptions { ResponseWriter = WriteAsync }).AllowAnonymous();
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false, ResponseWriter = WriteAsync }).AllowAnonymous();
 
         return app;
     }

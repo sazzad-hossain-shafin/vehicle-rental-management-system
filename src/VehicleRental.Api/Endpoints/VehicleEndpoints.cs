@@ -1,5 +1,6 @@
 using VehicleRental.Api.Contracts;
 using VehicleRental.Api.Http;
+using VehicleRental.Api.Security;
 using VehicleRental.Application;
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Vehicles;
@@ -15,6 +16,7 @@ internal static class VehicleEndpoints
 
         group.MapGet("/", ListVehiclesAsync)
             .WithName("ListVehicles")
+            .AllowAnonymous()
             .WithSummary("Lists vehicles, one page at a time")
             .WithDescription("Filters are optional and combine. Results are ordered by registration number.")
             .Produces<PagedResult<VehicleDto>>()
@@ -23,6 +25,7 @@ internal static class VehicleEndpoints
 
         group.MapGet("/{id}", GetVehicleAsync)
             .WithName("GetVehicleById")
+            .AllowAnonymous()
             .WithSummary("Gets a vehicle by its ID")
             .Produces<VehicleDto>()
             .ProducesProblem(StatusCodes.Status400BadRequest)
@@ -30,6 +33,7 @@ internal static class VehicleEndpoints
 
         group.MapGet("/by-registration/{registrationNumber}", GetVehicleByRegistrationAsync)
             .WithName("GetVehicleByRegistrationNumber")
+            .AllowAnonymous()
             .WithSummary("Gets a vehicle by its registration number")
             .WithDescription("Case-insensitive. Use the vehicle's ID for everything else.")
             .Produces<VehicleDto>()
@@ -37,6 +41,7 @@ internal static class VehicleEndpoints
 
         group.MapPost("/", CreateVehicleAsync)
             .WithName("CreateVehicle")
+            .RequireAuthorization(Policies.FleetManage)
             .WithSummary("Adds a vehicle to the fleet")
             .WithDescription("The new vehicle is available. The registration number must be unique.")
             .WithRequestValidation<CreateVehicleRequest>()

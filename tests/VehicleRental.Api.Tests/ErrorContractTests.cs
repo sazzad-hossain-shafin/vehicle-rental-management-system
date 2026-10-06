@@ -13,7 +13,9 @@ public class ErrorContractTests : IDisposable
     private readonly ApiFactory _factory = new(ApiFactory.UnreachableDatabase);
     private readonly HttpClient _client;
 
-    public ErrorContractTests() => _client = _factory.CreateClient();
+    // Signed in as staff, so requests get past authentication and reach the validation and error handling
+    // these tests are about. (Authentication itself is tested separately.)
+    public ErrorContractTests() => _client = _factory.CreateClientAs(VehicleRental.Application.Security.Roles.Staff);
 
     public void Dispose()
     {

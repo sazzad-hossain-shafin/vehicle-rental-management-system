@@ -157,6 +157,47 @@ public sealed class RentalService
     }
 
     /// <summary>
+    /// A rental, but only if it belongs to the given customer. A rental that belongs to someone else is
+    /// reported exactly like one that does not exist, so a customer cannot discover other customers' rentals.
+    /// </summary>
+    /// <exception cref="NotFoundException">The rental does not exist or belongs to another customer.</exception>
+    public async Task<RentalDto> GetCustomerRentalAsync(
+        Guid rentalId,
+        Guid customerId,
+        CancellationToken cancellationToken = default)
+    {
+        Rental? rental = await _rentals.GetByIdAsync(rentalId, cancellationToken);
+
+        if (rental is null || rental.Customer.Id != customerId)
+        {
+            throw new NotFoundException($"Rental '{rentalId}' was not found.");
+        }
+
+        return rental.ToDto();
+    }
+
+    /// <summary>
+    /// One page of a single customer's rentals, oldest start date first.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The page or page size is out of range (see <see cref="Paging"/>).</exception>
+    public async Task<PagedResult<RentalDto>> GetCustomerRentalHistoryPageAsync(
+        Guid customerId,
+        int page = 1,
+        int pageSize = Paging.DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        int skip = Paging.ToSkip(page, pageSize);
+
+        var result = await _rentals.GetPageForCustomerAsync(customerId, skip, pageSize, cancellationToken);
+
+        return new PagedResult<RentalDto>(
+            result.Items.Select(r => r.ToDto()).ToList(),
+            page,
+            pageSize,
+            result.TotalCount);
+    }
+
+    /// <summary>
     /// The vehicle's active rental, or null if it is not rented.
     /// </summary>
     /// <exception cref="NotFoundException">The vehicle does not exist.</exception>

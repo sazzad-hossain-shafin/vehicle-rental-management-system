@@ -8,11 +8,11 @@ This project began as an object-oriented programming exercise and is now being i
 
 A layered .NET solution with a domain model, an application layer, PostgreSQL persistence through EF Core, an ASP.NET Core Web API, automated tests, and a secondary console client. Data is stored in PostgreSQL, so it survives restarts. Both the API and the console client need a database to run (see [Running Locally](#running-locally)).
 
-**Authentication is not implemented yet.** The API is open and must not be exposed to an untrusted network.
+**Authentication and authorization** use ASP.NET Core Identity and short-lived JWT bearer tokens, with Admin, Staff and Customer roles. See [docs/authentication.md](docs/authentication.md).
 
 ## Current Features
 
-**Web API** (`VehicleRental.Api`) &mdash; Minimal APIs under `/api/v1`, documented with OpenAPI. See [docs/api.md](docs/api.md).
+**Web API** (`VehicleRental.Api`) &mdash; Minimal APIs under `/api/v1`, documented with OpenAPI. See [docs/api.md](docs/api.md). Browsing vehicles, signing in and registering a customer account are public; everything else needs a token and the right role.
 
 | Method | Route | Purpose |
 |--------|-------|---------|
@@ -24,8 +24,13 @@ A layered .NET solution with a domain model, an application layer, PostgreSQL pe
 | POST | `/rentals` | Start a rental |
 | GET | `/rentals`, `/rentals/{id}` | Rental history (paged), one rental |
 | POST | `/rentals/{id}/return` | Complete a rental |
+| POST | `/auth/login`, `/auth/register` | Sign in; create a customer account |
+| POST | `/admin/staff` | Create a staff account (Admin only) |
+| GET | `/me`, `/me/customer`, `/me/rentals` | The signed-in account; a customer's own profile and rentals |
 
 - Errors are RFC 9457 Problem Details, produced in one place; unexpected errors never leak internal detail.
+- Authorization is by named policies, and every endpoint requires a sign-in unless it is explicitly marked anonymous, so a new endpoint can't be left open by accident.
+- Customers can only reach their own data. The customer is taken from the signed token, never from an ID in the request, and another customer's rental looks exactly like one that doesn't exist.
 - Health checks: `/health` (database reachable and migrated) and `/health/live`.
 - OpenAPI document and interactive reference at `/openapi/v1.json` and `/scalar/v1`, in Development only.
 
@@ -47,6 +52,9 @@ A layered .NET solution with a domain model, an application layer, PostgreSQL pe
 - Clear error types for not-found and conflict cases.
 
 **Infrastructure layer** (`VehicleRental.Infrastructure`)
+
+- ASP.NET Core Identity for accounts, in the same database context as the business data, so a customer and their login are created in one transaction. Password hashing, validation and lockout (5 failures, 15 minutes) are Identity's; the domain knows nothing about Identity.
+- JWT access tokens (HMAC-SHA256, 30 minutes) carrying only the account ID, roles and, for customers, the customer ID. The API refuses to start with a missing or weak signing key.
 
 - EF Core with PostgreSQL (Npgsql), configured with the Fluent API.
 - Repository and unit-of-work implementations. Searches are filtered in SQL, and read-only queries are not tracked.
@@ -80,8 +88,8 @@ Clients --HTTP--> API --> Application --> Domain
 |---------|------|
 | `src/VehicleRental.Domain` | Entities, enums and pricing rules. No framework dependencies. |
 | `src/VehicleRental.Application` | Use cases, repository abstractions and DTOs. No database or web dependencies. |
-| `src/VehicleRental.Infrastructure` | EF Core, PostgreSQL mapping, repositories, migrations, health check. |
-| `src/VehicleRental.Api` | HTTP endpoints, request validation, error handling, OpenAPI, health checks. |
+| `src/VehicleRental.Infrastructure` | EF Core, PostgreSQL mapping, repositories, migrations, health check, Identity accounts and token issuing. |
+| `src/VehicleRental.Api` | HTTP endpoints, authentication and authorization, request validation, error handling, OpenAPI, health checks. |
 | `src/VehicleRental.Console` | Secondary text-based client. |
 | `tests/VehicleRental.Domain.Tests` | Unit tests for the domain. |
 | `tests/VehicleRental.Application.Tests` | Unit tests for the use cases, using in-memory fakes. |
@@ -92,7 +100,7 @@ Clients --HTTP--> API --> Application --> Domain
 
 Planned work, none of which exists yet:
 
-- Authentication and authorization
+- Refresh tokens, email verification and password reset
 - Booking and availability checking
 - Docker and CI
 - Frontend (later)
@@ -135,11 +143,29 @@ To add a migration after changing the model:
 dotnet ef migrations add <Name> --project src/VehicleRental.Infrastructure --output-dir Persistence/Migrations
 ```
 
+### Configure sign-in secrets
+
+The API will not start without a token signing key. Create a random one and keep it in user secrets (or the `Jwt__SigningKey` environment variable), never in the repository:
+
+```bash
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/VehicleRental.Api
+# PowerShell: [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+```
+
+Optionally create a first admin account at startup (needed to create staff accounts; the password must be strong):
+
+```bash
+dotnet user-secrets set "Seed:Admin:Email" "admin@example.test" --project src/VehicleRental.Api
+dotnet user-secrets set "Seed:Admin:Password" "<a strong password>" --project src/VehicleRental.Api
+```
+
 ### Run the API
 
 ```bash
 dotnet run --project src/VehicleRental.Api
 ```
+
+Sign in with `POST /api/v1/auth/login`, then send `Authorization: Bearer <accessToken>`. In the interactive reference, use **Authorize** and paste the token.
 
 It listens on `http://localhost:5270` (change with `ASPNETCORE_URLS`). In Development, open <http://localhost:5270/scalar/v1> for the interactive API reference, or fetch `/openapi/v1.json`. Check `http://localhost:5270/health` to confirm the database is ready. If the schema is not migrated, the API still starts, logs a warning, and `/health` answers 503.
 
@@ -166,7 +192,7 @@ Without that variable, those tests are skipped and the rest of the suite still r
 
 ## Project Status
 
-Active portfolio redevelopment. The platform has a working, tested HTTP API on PostgreSQL. It has no authentication, frontend, Docker setup or CI yet.
+Active portfolio redevelopment. The platform has a working, tested, authenticated HTTP API on PostgreSQL. It has no frontend, Docker setup or CI yet.
 
 ## License
 

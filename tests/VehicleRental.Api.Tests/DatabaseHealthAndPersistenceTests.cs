@@ -59,8 +59,9 @@ public class DatabaseHealthAndPersistenceTests : ApiTestBase
         var rental = await Client.StartRentalAsync(vehicle.Id, customer.Id, 3);
 
         // A brand-new application instance against the same database stands in for a restart.
-        await using var restarted = new ApiFactory(Api.ConnectionString);
-        using var client = restarted.CreateClient();
+        // It uses the same signing key, as a restarted deployment with the same configuration would.
+        await using var restarted = new ApiFactory(Api.ConnectionString, signingKey: Api.Factory.SigningKey);
+        using var client = restarted.CreateClientWithToken(Client.DefaultRequestHeaders.Authorization!.Parameter!);
 
         var reloadedVehicle = await (await client.GetAsync($"/api/v1/vehicles/{vehicle.Id}")).ReadAsync<VehicleDto>();
         var reloadedRental = await (await client.GetAsync($"/api/v1/rentals/{rental.Id}")).ReadAsync<RentalDto>();

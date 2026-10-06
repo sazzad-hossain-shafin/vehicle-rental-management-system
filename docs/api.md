@@ -2,7 +2,7 @@
 
 A concise guide to the HTTP API. The generated OpenAPI document is the complete reference; this page covers the conventions it cannot express.
 
-**Authentication is not implemented yet.** Every endpoint is open. Do not expose this API to an untrusted network.
+Most endpoints need a signed-in account (a JWT bearer token), and what you may do depends on your role: Admin, Staff or Customer. Browsing vehicles, signing in, registering a customer account and the health checks are public. See [authentication](authentication.md) for the full access matrix, roles and customer-ownership rules.
 
 ## Running it
 
@@ -12,6 +12,12 @@ dotnet user-secrets set "ConnectionStrings:VehicleRentalDatabase" \
   "Host=localhost;Port=5432;Database=vehiclerental;Username=<user>;Password=<password>" \
   --project src/VehicleRental.Api
 dotnet ef database update --project src/VehicleRental.Infrastructure   # needs the connection string in the environment
+
+# the API refuses to start without a token signing key (a random secret, never committed)
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/VehicleRental.Api
+# optional: create the first admin at startup
+dotnet user-secrets set "Seed:Admin:Email" "admin@example.test" --project src/VehicleRental.Api
+dotnet user-secrets set "Seed:Admin:Password" "<a strong password>" --project src/VehicleRental.Api
 
 dotnet run --project src/VehicleRental.Api       # http://localhost:5270
 ```
@@ -48,6 +54,30 @@ IDs in URLs are permanent GUIDs. Business identifiers (registration number, cust
 | GET | `/rentals` | Rental history (paged), oldest start date first | 200 |
 | GET | `/rentals/{id}` | One rental | 200 |
 | POST | `/rentals/{id}/return` | Complete a rental | 200 |
+
+Access: vehicle reads are public; `POST /vehicles`, the customer endpoints and the rental desk endpoints (`POST /rentals`, `GET /rentals`, `POST .../return`) are for Staff and Admin; `GET /rentals/{id}` is for any signed-in account, but customers only get their own.
+
+### Accounts and sign-in
+
+| Method | Route | Access | Purpose | Success |
+|--------|-------|--------|---------|---------|
+| POST | `/auth/login` | Public | Exchange email and password for an access token | 200 |
+| POST | `/auth/register` | Public | Create a customer account (and its customer record) | 201 |
+| POST | `/admin/staff` | Admin | Create a staff account | 201 |
+| GET | `/me` | Signed in | Who am I: id, email, roles, linked customer | 200 |
+| GET | `/me/customer` | Customer | My own customer profile | 200 |
+| GET | `/me/rentals` | Customer | My own rentals (paged) | 200 |
+
+```http
+POST /api/v1/auth/login
+{ "email": "desk@example.test", "password": "..." }
+```
+```json
+{ "accessToken": "<jwt>", "tokenType": "Bearer", "expiresAtUtc": "2026-10-06T11:30:00Z",
+  "user": { "id": "...", "email": "desk@example.test", "roles": ["Staff"], "customerId": null, "customerNumber": null } }
+```
+
+Send the token as `Authorization: Bearer <accessToken>`. Tokens last 30 minutes; there are no refresh tokens yet. Registration has no role field: every registered account is a Customer.
 
 Returning is an action (`POST .../return`) rather than a `PATCH` of the status, because completing a rental is a rule-bound state change: clients cannot set arbitrary states.
 
@@ -104,7 +134,9 @@ Every error is [Problem Details](https://www.rfc-editor.org/rfc/rfc9457) (`appli
 | Status | When |
 |--------|------|
 | 400 | Malformed JSON, missing required fields (with an `errors` map per field), unknown enum text, invalid GUID or number, or a business rule such as a non-positive rate or a rental of zero days |
-| 404 | The vehicle, customer or rental does not exist (including an unknown route) |
+| 401 | No valid token (missing, malformed, expired or wrongly signed), or a failed login. Never says which |
+| 403 | Signed in, but this role may not do this |
+| 404 | The vehicle, customer or rental does not exist (including an unknown route). A customer asking for another customer's rental also gets 404 |
 | 409 | A duplicate registration or customer number, a vehicle that is already rented, a rental that is already completed, or a request that lost a race with another one |
 | 500 | Anything unexpected. The body is generic: no stack trace, SQL, connection details or file paths |
 
@@ -112,4 +144,4 @@ The 409 for a lost race is a real guarantee: two simultaneous requests can never
 
 ## Not included yet
 
-Authentication and authorization, rate limiting, CORS (no browser client exists yet), updating or deleting vehicles and customers, reservations/bookings, payments.
+Refresh tokens, email verification and password reset, rate limiting, CORS (no browser client exists yet), updating or deleting vehicles and customers, reservations/bookings, payments.

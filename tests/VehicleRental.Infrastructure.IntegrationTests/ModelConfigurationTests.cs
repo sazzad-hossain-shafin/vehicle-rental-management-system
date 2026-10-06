@@ -171,9 +171,51 @@ public class ModelConfigurationTests
 
         Assert.Contains("UX_Rentals_ActiveRentalPerVehicle", script);
         Assert.Contains("ON DELETE RESTRICT", script);
-        Assert.DoesNotContain("ON DELETE CASCADE", script);
         Assert.Contains("CK_Vehicles_DailyRate_Positive", script);
         Assert.Contains("IX_Vehicles_RegistrationNumber", script);
         Assert.Contains("IX_Customers_CustomerNumber", script);
+
+        // Rental history is never cascade-deleted. (Identity's own join tables, such as a user's role
+        // links, do cascade from their user, which is expected, so only the business tables are checked.)
+        foreach (string table in new[] { "Vehicles", "Customers", "Rentals" })
+        {
+            Assert.DoesNotContain("ON DELETE CASCADE", CreateTableStatement(script, table));
+        }
+    }
+
+    [Fact]
+    public void CustomerAccounts_ReferenceTheirCustomer_WithoutCascadeAndAtMostOneEach()
+    {
+        using var context = CreateContext();
+        var users = context.Model.FindEntityType(typeof(VehicleRental.Infrastructure.Identity.ApplicationUser))!;
+
+        var customerLink = Assert.Single(users.GetForeignKeys());
+        Assert.Equal(DeleteBehavior.Restrict, customerLink.DeleteBehavior);
+        Assert.False(customerLink.IsRequired, "Staff and admin accounts have no customer.");
+
+        var index = Assert.Single(users.GetIndexes(), i => i.IsUnique && i.Properties.Single().Name == "CustomerId");
+        Assert.Contains("NOT NULL", index.GetFilter());
+    }
+
+    [Fact]
+    public void Roles_AreSeededByTheMigration_WithFixedIds()
+    {
+        using var context = CreateContext();
+        var designTimeModel = Microsoft.EntityFrameworkCore.Infrastructure.AccessorExtensions
+            .GetService<Microsoft.EntityFrameworkCore.Metadata.IDesignTimeModel>(context).Model;
+        var roles = designTimeModel.FindEntityType(typeof(Microsoft.AspNetCore.Identity.IdentityRole<Guid>))!;
+
+        var seeded = roles.GetSeedData().Select(d => (string)d["Name"]!).Order().ToList();
+
+        Assert.Equal(new[] { "Admin", "Customer", "Staff" }, seeded);
+    }
+
+    /// <summary>The CREATE TABLE statement for one table, up to the semicolon that ends it.</summary>
+    private static string CreateTableStatement(string script, string table)
+    {
+        int start = script.IndexOf($"CREATE TABLE \"{table}\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"No CREATE TABLE for {table}.");
+
+        return script[start..script.IndexOf(");", start, StringComparison.Ordinal)];
     }
 }

@@ -61,6 +61,31 @@ public sealed class RentalRepository : IRentalRepository
         return new PageResult<Rental>(items, total);
     }
 
+    // The customer filter is part of the SQL WHERE clause, so a customer's page never contains other
+    // customers' rows, and the count only counts theirs.
+    public async Task<PageResult<Rental>> GetPageForCustomerAsync(
+        Guid customerId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        IQueryable<Rental> own = _db.Rentals.Where(r => r.Customer.Id == customerId);
+
+        long total = await own.LongCountAsync(cancellationToken);
+
+        List<Rental> items = await own
+            .AsNoTrackingWithIdentityResolution()
+            .Include(r => r.Customer)
+            .Include(r => r.Vehicle)
+            .OrderBy(r => r.StartDate)
+            .ThenBy(r => r.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return new PageResult<Rental>(items, total);
+    }
+
     // The INSERT happens in IUnitOfWork.SaveChangesAsync.
     public Task AddAsync(Rental rental, CancellationToken cancellationToken = default)
     {

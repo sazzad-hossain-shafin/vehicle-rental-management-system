@@ -26,6 +26,16 @@ public interface IRentalRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// One page of a single customer's rentals, oldest start date first, with the total number of
+    /// that customer's rentals. The filtering and paging are done by the database.
+    /// </summary>
+    Task<PageResult<Rental>> GetPageForCustomerAsync(
+        Guid customerId,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a rental. It is stored when <see cref="IUnitOfWork.SaveChangesAsync"/> succeeds.
     /// </summary>
     Task AddAsync(Rental rental, CancellationToken cancellationToken = default);
