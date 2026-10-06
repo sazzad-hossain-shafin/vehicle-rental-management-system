@@ -317,7 +317,7 @@ public class RentalServiceTests
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => _app.Rentals.StartRentalAsync(
-                new(VehicleRegistrationNumber: "V1", CustomerNumber: "C1", CustomerName: "Alice", RentalDays: 3),
+                new VehicleRental.Application.Rentals.StartRentalRequest(VehicleRegistrationNumber: "V1", CustomerNumber: "C1", CustomerName: "Alice", RentalDays: 3),
                 cts.Token));
 
         Assert.Equal(0, _app.RentalRepository.Count);

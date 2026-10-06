@@ -15,6 +15,26 @@ internal sealed class InMemoryVehicleRepository : IVehicleRepository
 
     public int Count => _vehicles.Count;
 
+    public Task<Vehicle?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_vehicles.FirstOrDefault(v => v.Id == id));
+    }
+
+    public Task<PageResult<Vehicle>> SearchPageAsync(
+        VehicleSearchCriteria criteria,
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var all = SearchAsync(criteria, cancellationToken).Result;
+
+        return Task.FromResult(new PageResult<Vehicle>(all.Skip(skip).Take(take).ToList(), all.Count));
+    }
+
     public Task<Vehicle?> GetByRegistrationNumberAsync(
         string registrationNumber,
         CancellationToken cancellationToken = default)

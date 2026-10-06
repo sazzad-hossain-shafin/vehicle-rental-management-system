@@ -4,6 +4,9 @@ namespace VehicleRental.Application.Abstractions;
 
 public interface IVehicleRepository
 {
+    /// <returns>The vehicle, ready to be changed and saved, or null if there is none.</returns>
+    Task<Vehicle?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <param name="registrationNumber">A registration number in normalized form; see <see cref="Vehicle.NormalizeRegistrationNumber"/>.</param>
     /// <returns>The vehicle, ready to be changed and saved, or null if there is none.</returns>
     Task<Vehicle?> GetByRegistrationNumberAsync(
@@ -19,6 +22,16 @@ public interface IVehicleRepository
     /// </summary>
     Task<IReadOnlyList<Vehicle>> SearchAsync(
         VehicleSearchCriteria criteria,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// One page of the vehicles matching the criteria, ordered by registration number, with the
+    /// total number of matches. Both the filtering and the paging are done by the database.
+    /// </summary>
+    Task<PageResult<Vehicle>> SearchPageAsync(
+        VehicleSearchCriteria criteria,
+        int skip,
+        int take,
         CancellationToken cancellationToken = default);
 
     /// <summary>

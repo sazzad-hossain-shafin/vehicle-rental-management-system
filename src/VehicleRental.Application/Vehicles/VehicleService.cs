@@ -44,6 +44,15 @@ public sealed class VehicleService
         return vehicle.ToDto();
     }
 
+    /// <exception cref="NotFoundException">No vehicle has this ID.</exception>
+    public async Task<VehicleDto> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var vehicle = await _vehicles.GetByIdAsync(id, cancellationToken);
+
+        return vehicle?.ToDto()
+               ?? throw new NotFoundException($"Vehicle '{id}' was not found.");
+    }
+
     /// <exception cref="NotFoundException">No vehicle has this registration number.</exception>
     public async Task<VehicleDto> GetByRegistrationNumberAsync(
         string registrationNumber,
@@ -84,5 +93,37 @@ public sealed class VehicleService
         var vehicles = await _vehicles.SearchAsync(criteria, cancellationToken);
 
         return vehicles.Select(v => v.ToDto()).ToList();
+    }
+
+    /// <summary>
+    /// One page of the vehicles matching the criteria, ordered by registration number.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// The page or page size is out of range (see <see cref="Paging"/>), or the maximum daily rate is negative.
+    /// </exception>
+    public async Task<PagedResult<VehicleDto>> SearchPageAsync(
+        VehicleSearchCriteria criteria,
+        int page = 1,
+        int pageSize = Paging.DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(criteria);
+
+        if (criteria.MaximumDailyRate < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(criteria),
+                "The maximum daily rate cannot be negative.");
+        }
+
+        int skip = Paging.ToSkip(page, pageSize);
+
+        var result = await _vehicles.SearchPageAsync(criteria, skip, pageSize, cancellationToken);
+
+        return new PagedResult<VehicleDto>(
+            result.Items.Select(v => v.ToDto()).ToList(),
+            page,
+            pageSize,
+            result.TotalCount);
     }
 }

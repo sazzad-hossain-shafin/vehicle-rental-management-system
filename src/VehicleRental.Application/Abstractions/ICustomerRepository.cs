@@ -4,6 +4,8 @@ namespace VehicleRental.Application.Abstractions;
 
 public interface ICustomerRepository
 {
+    Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     /// <param name="customerNumber">A customer number in normalized form; see <see cref="Customer.NormalizeCustomerNumber"/>.</param>
     Task<Customer?> GetByCustomerNumberAsync(
         string customerNumber,

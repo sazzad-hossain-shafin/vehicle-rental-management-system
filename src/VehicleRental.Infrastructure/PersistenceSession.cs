@@ -1,25 +1,13 @@
-using Microsoft.EntityFrameworkCore;
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Infrastructure.Persistence;
 
 namespace VehicleRental.Infrastructure;
 
-/// <summary>Whether the database is ready for the application to use.</summary>
-public enum DatabaseStatus
-{
-    Ready,
-
-    /// <summary>The server or the database could not be reached with the configured connection string.</summary>
-    CannotConnect,
-
-    /// <summary>The database is reachable but its schema is missing or out of date.</summary>
-    MigrationsPending
-}
-
 /// <summary>
-/// One database context with the repositories and unit of work that share it. A client that has
-/// no dependency injection of its own (the console app) creates one per command and disposes it,
-/// so a context never lives long enough to hold stale data.
+/// One database context with the repositories and unit of work that share it, for a client that has
+/// no dependency injection of its own (the console app). It creates one per command and disposes it,
+/// so a context never lives long enough to hold stale data. The web API uses dependency injection
+/// instead (see <see cref="DependencyInjection"/>).
 /// </summary>
 public sealed class PersistenceSession : IAsyncDisposable
 {
@@ -54,17 +42,8 @@ public sealed class PersistenceSession : IAsyncDisposable
     /// <summary>
     /// Checks the connection and whether every migration has been applied. It never changes the database.
     /// </summary>
-    public async Task<DatabaseStatus> CheckDatabaseAsync(CancellationToken cancellationToken = default)
-    {
-        if (!await _db.Database.CanConnectAsync(cancellationToken))
-        {
-            return DatabaseStatus.CannotConnect;
-        }
-
-        var pending = await _db.Database.GetPendingMigrationsAsync(cancellationToken);
-
-        return pending.Any() ? DatabaseStatus.MigrationsPending : DatabaseStatus.Ready;
-    }
+    public Task<DatabaseStatus> CheckDatabaseAsync(CancellationToken cancellationToken = default) =>
+        new DatabaseStatusChecker(_db).CheckAsync(cancellationToken);
 
     public ValueTask DisposeAsync() => _db.DisposeAsync();
 }

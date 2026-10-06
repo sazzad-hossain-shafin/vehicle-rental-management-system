@@ -41,6 +41,18 @@ internal sealed class InMemoryRentalRepository : IRentalRepository
         return Task.FromResult<IReadOnlyList<Rental>>(_rentals.OrderBy(r => r.StartDate).ToList());
     }
 
+    public Task<PageResult<Rental>> GetPageAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var ordered = _rentals.OrderBy(r => r.StartDate).ToList();
+
+        return Task.FromResult(new PageResult<Rental>(ordered.Skip(skip).Take(take).ToList(), ordered.Count));
+    }
+
     public Task AddAsync(Rental rental, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -40,8 +40,9 @@ public sealed class RentalService
         PricingPolicy.IsPromotionalDiscountAvailable(rentalDays);
 
     /// <summary>
-    /// Starts a rental today. An unknown customer number registers a new customer; a known
-    /// number is reused if the name matches (see <see cref="CustomerResolver"/>).
+    /// Starts a rental today, identifying the vehicle by registration number and the customer by
+    /// number and name. An unknown customer number registers a new customer; a known number is
+    /// reused if the name matches (see <see cref="CustomerResolver"/>).
     /// </summary>
     /// <remarks>
     /// The vehicle, the rental and any new customer are saved together or not at all. If another
@@ -61,13 +62,7 @@ public sealed class RentalService
 
         Vehicle vehicle = await GetVehicleAsync(request.VehicleRegistrationNumber, cancellationToken);
 
-        bool hasActiveRental =
-            await _rentals.GetActiveForVehicleAsync(vehicle.Id, cancellationToken) is not null;
-
-        if (hasActiveRental || vehicle.AvailabilityStatus != VehicleAvailabilityStatus.Available)
-        {
-            throw new ConflictException($"Vehicle '{vehicle.RegistrationNumber}' is not available.");
-        }
+        EnsureAvailable(vehicle, await HasActiveRentalAsync(vehicle, cancellationToken));
 
         var (customer, isNewCustomer) = await CustomerResolver.ResolveAsync(
             _customers,
@@ -75,26 +70,43 @@ public sealed class RentalService
             request.CustomerName,
             cancellationToken);
 
-        DateOnly startDate = Today();
-        DateOnly returnDate = startDate.AddDays(request.RentalDays);
+        return await StartAsync(
+            vehicle,
+            customer,
+            isNewCustomer,
+            request.RentalDays,
+            request.PromotionalDiscountRequested,
+            cancellationToken);
+    }
 
-        int billableDays = Rental.CalculateBillableDays(startDate, returnDate);
-        IVehiclePricingStrategy strategy =
-            PricingPolicy.SelectStrategy(billableDays, request.PromotionalDiscountRequested);
+    /// <summary>
+    /// Starts a rental today for an existing vehicle and an existing customer, identified by ID.
+    /// The same saving and conflict guarantees apply as for the number-based overload.
+    /// </summary>
+    /// <exception cref="NotFoundException">The vehicle or the customer does not exist.</exception>
+    /// <exception cref="ConflictException">The vehicle is already rented.</exception>
+    /// <exception cref="ArgumentException">The rental length is invalid.</exception>
+    public async Task<RentalDto> StartRentalAsync(
+        StartRentalByIdRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
 
-        // Every check has passed. Starting the rental is the first change to any entity,
-        // and nothing is stored until it succeeds.
-        Rental rental = Rental.Start(customer, vehicle, startDate, returnDate, strategy);
+        Vehicle vehicle = await _vehicles.GetByIdAsync(request.VehicleId, cancellationToken)
+                          ?? throw new NotFoundException($"Vehicle '{request.VehicleId}' was not found.");
 
-        if (isNewCustomer)
-        {
-            await _customers.AddAsync(customer, cancellationToken);
-        }
+        Customer customer = await _customers.GetByIdAsync(request.CustomerId, cancellationToken)
+                            ?? throw new NotFoundException($"Customer '{request.CustomerId}' was not found.");
 
-        await _rentals.AddAsync(rental, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        EnsureAvailable(vehicle, await HasActiveRentalAsync(vehicle, cancellationToken));
 
-        return rental.ToDto();
+        return await StartAsync(
+            vehicle,
+            customer,
+            isNewCustomer: false,
+            request.RentalDays,
+            request.PromotionalDiscountRequested,
+            cancellationToken);
     }
 
     /// <summary>
@@ -112,11 +124,36 @@ public sealed class RentalService
                         ?? throw new ConflictException(
                             $"Vehicle '{vehicle.RegistrationNumber}' is not currently rented.");
 
-        rental.Complete(Today());
+        return await CompleteAsync(rental, cancellationToken);
+    }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+    /// <summary>
+    /// Completes the rental with this ID, as of today, and makes its vehicle available again.
+    /// </summary>
+    /// <exception cref="NotFoundException">The rental does not exist.</exception>
+    /// <exception cref="ConflictException">The rental is already completed, or it was just changed by another request.</exception>
+    public async Task<RentalDto> ReturnRentalAsync(
+        Guid rentalId,
+        CancellationToken cancellationToken = default)
+    {
+        Rental rental = await _rentals.GetByIdAsync(rentalId, cancellationToken)
+                        ?? throw new NotFoundException($"Rental '{rentalId}' was not found.");
 
-        return rental.ToDto();
+        if (rental.Status != RentalStatus.Active)
+        {
+            throw new ConflictException($"Rental '{rentalId}' has already been completed.");
+        }
+
+        return await CompleteAsync(rental, cancellationToken);
+    }
+
+    /// <exception cref="NotFoundException">The rental does not exist.</exception>
+    public async Task<RentalDto> GetRentalAsync(Guid rentalId, CancellationToken cancellationToken = default)
+    {
+        Rental? rental = await _rentals.GetByIdAsync(rentalId, cancellationToken);
+
+        return rental?.ToDto()
+               ?? throw new NotFoundException($"Rental '{rentalId}' was not found.");
     }
 
     /// <summary>
@@ -135,7 +172,8 @@ public sealed class RentalService
     }
 
     /// <summary>
-    /// Every rental, active and completed, oldest first.
+    /// Every rental, active and completed, oldest first. Intended for small data sets such as the
+    /// console client; use <see cref="GetRentalHistoryPageAsync"/> for anything that can grow.
     /// </summary>
     public async Task<IReadOnlyList<RentalDto>> GetRentalHistoryAsync(
         CancellationToken cancellationToken = default)
@@ -143,6 +181,93 @@ public sealed class RentalService
         var rentals = await _rentals.GetAllAsync(cancellationToken);
 
         return rentals.Select(r => r.ToDto()).ToList();
+    }
+
+    /// <summary>
+    /// One page of the rental history, oldest start date first.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The page or page size is out of range (see <see cref="Paging"/>).</exception>
+    public async Task<PagedResult<RentalDto>> GetRentalHistoryPageAsync(
+        int page = 1,
+        int pageSize = Paging.DefaultPageSize,
+        CancellationToken cancellationToken = default)
+    {
+        int skip = Paging.ToSkip(page, pageSize);
+
+        var result = await _rentals.GetPageAsync(skip, pageSize, cancellationToken);
+
+        return new PagedResult<RentalDto>(
+            result.Items.Select(r => r.ToDto()).ToList(),
+            page,
+            pageSize,
+            result.TotalCount);
+    }
+
+    private async Task<bool> HasActiveRentalAsync(Vehicle vehicle, CancellationToken cancellationToken) =>
+        await _rentals.GetActiveForVehicleAsync(vehicle.Id, cancellationToken) is not null;
+
+    private static void EnsureAvailable(Vehicle vehicle, bool hasActiveRental)
+    {
+        if (hasActiveRental || vehicle.AvailabilityStatus != VehicleAvailabilityStatus.Available)
+        {
+            throw new ConflictException($"Vehicle '{vehicle.RegistrationNumber}' is not available.");
+        }
+    }
+
+    private async Task<RentalDto> StartAsync(
+        Vehicle vehicle,
+        Customer customer,
+        bool isNewCustomer,
+        int rentalDays,
+        bool promotionalDiscountRequested,
+        CancellationToken cancellationToken)
+    {
+        DateOnly startDate = Today();
+        DateOnly returnDate = startDate.AddDays(rentalDays);
+
+        int billableDays = Rental.CalculateBillableDays(startDate, returnDate);
+        IVehiclePricingStrategy strategy =
+            PricingPolicy.SelectStrategy(billableDays, promotionalDiscountRequested);
+
+        // Every check has passed. Starting the rental is the first change to any entity,
+        // and nothing is stored until it succeeds.
+        Rental rental;
+
+        try
+        {
+            rental = Rental.Start(customer, vehicle, startDate, returnDate, strategy);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // The domain refused a state change, for example because the vehicle was rented in the meantime.
+            throw new ConflictException(ex.Message, ex);
+        }
+
+        if (isNewCustomer)
+        {
+            await _customers.AddAsync(customer, cancellationToken);
+        }
+
+        await _rentals.AddAsync(rental, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return rental.ToDto();
+    }
+
+    private async Task<RentalDto> CompleteAsync(Rental rental, CancellationToken cancellationToken)
+    {
+        try
+        {
+            rental.Complete(Today());
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new ConflictException(ex.Message, ex);
+        }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return rental.ToDto();
     }
 
     private async Task<Vehicle> GetVehicleAsync(string registrationNumber, CancellationToken cancellationToken) =>

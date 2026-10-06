@@ -17,6 +17,15 @@ public interface IRentalRepository
     Task<IReadOnlyList<Rental>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// One page of rentals, oldest start date first, with their customers and vehicles and the
+    /// total number of rentals. The paging is done by the database.
+    /// </summary>
+    Task<PageResult<Rental>> GetPageAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds a rental. It is stored when <see cref="IUnitOfWork.SaveChangesAsync"/> succeeds.
     /// </summary>
     Task AddAsync(Rental rental, CancellationToken cancellationToken = default);

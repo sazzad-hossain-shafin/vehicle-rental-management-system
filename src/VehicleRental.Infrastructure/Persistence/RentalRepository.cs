@@ -40,6 +40,27 @@ public sealed class RentalRepository : IRentalRepository
             .ThenBy(r => r.Id) // time-ordered UUIDs, so rentals on the same day stay in creation order
             .ToListAsync(cancellationToken);
 
+    // Two queries: the total count, and one page (with its customers and vehicles) in a stable order.
+    public async Task<PageResult<Rental>> GetPageAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        long total = await _db.Rentals.LongCountAsync(cancellationToken);
+
+        List<Rental> items = await _db.Rentals
+            .AsNoTrackingWithIdentityResolution()
+            .Include(r => r.Customer)
+            .Include(r => r.Vehicle)
+            .OrderBy(r => r.StartDate)
+            .ThenBy(r => r.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+        return new PageResult<Rental>(items, total);
+    }
+
     // The INSERT happens in IUnitOfWork.SaveChangesAsync.
     public Task AddAsync(Rental rental, CancellationToken cancellationToken = default)
     {

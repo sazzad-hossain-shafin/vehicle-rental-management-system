@@ -11,6 +11,9 @@ public sealed class CustomerRepository : ICustomerRepository
     public CustomerRepository(VehicleRentalDbContext db) => _db = db;
 
     // Tracked: a rental started with this customer attaches to the same instance.
+    public Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _db.Customers.FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+
     public Task<Customer?> GetByCustomerNumberAsync(
         string customerNumber,
         CancellationToken cancellationToken = default) =>

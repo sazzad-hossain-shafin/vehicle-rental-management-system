@@ -13,6 +13,13 @@ internal sealed class InMemoryCustomerRepository : ICustomerRepository
 
     public int Count => _customers.Count;
 
+    public Task<Customer?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_customers.FirstOrDefault(c => c.Id == id));
+    }
+
     public Task<Customer?> GetByCustomerNumberAsync(
         string customerNumber,
         CancellationToken cancellationToken = default)

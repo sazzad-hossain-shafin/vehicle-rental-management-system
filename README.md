@@ -6,26 +6,28 @@ This project began as an object-oriented programming exercise and is now being i
 
 ## Current Version
 
-A layered .NET solution with a domain model, an application layer, PostgreSQL persistence through EF Core, automated tests, and a temporary console client. Data is stored in PostgreSQL, so it survives restarts. The console client needs a database to run (see [Running Locally](#running-locally)).
+A layered .NET solution with a domain model, an application layer, PostgreSQL persistence through EF Core, an ASP.NET Core Web API, automated tests, and a secondary console client. Data is stored in PostgreSQL, so it survives restarts. Both the API and the console client need a database to run (see [Running Locally](#running-locally)).
 
-On first run into an empty fleet, the console adds three fictional sample vehicles:
-
-| Registration | Vehicle | Type | Daily rate |
-|--------------|---------|------|-----------|
-| ABC-123 | Toyota Corolla (2022) | Car | $60 |
-| DEF-456 | Honda CB500 (2021) | Motorcycle | $40 |
-| GHI-789 | Toyota HiAce (2021) | Van | $90 |
+**Authentication is not implemented yet.** The API is open and must not be exposed to an untrusted network.
 
 ## Current Features
 
-Through a text menu, the console client can:
+**Web API** (`VehicleRental.Api`) &mdash; Minimal APIs under `/api/v1`, documented with OpenAPI. See [docs/api.md](docs/api.md).
 
-- List the vehicles that are currently available
-- Search vehicles by type (Car, Motorcycle, Van)
-- Filter vehicles by maximum daily rate
-- Rent a vehicle for a number of days and print a rental summary
-- Return a rented vehicle
-- Show the rental history
+| Method | Route | Purpose |
+|--------|-------|---------|
+| GET | `/vehicles` | List vehicles, paged, filtered by `vehicleType`, `maxDailyRate`, `availability` |
+| GET | `/vehicles/{id}`, `/vehicles/by-registration/{registrationNumber}` | Get a vehicle |
+| POST | `/vehicles` | Add a vehicle |
+| POST | `/customers` | Register a customer |
+| GET | `/customers/{id}`, `/customers/by-number/{customerNumber}` | Get a customer |
+| POST | `/rentals` | Start a rental |
+| GET | `/rentals`, `/rentals/{id}` | Rental history (paged), one rental |
+| POST | `/rentals/{id}/return` | Complete a rental |
+
+- Errors are RFC 9457 Problem Details, produced in one place; unexpected errors never leak internal detail.
+- Health checks: `/health` (database reachable and migrated) and `/health/live`.
+- OpenAPI document and interactive reference at `/openapi/v1.json` and `/scalar/v1`, in Development only.
 
 **Domain layer** (`VehicleRental.Domain`)
 
@@ -40,7 +42,8 @@ Through a text menu, the console client can:
 
 - Use-case services for vehicles, customers and rentals, returning read-only DTOs instead of domain entities.
 - Repository and unit-of-work abstractions, all asynchronous with cancellation support.
-- Customer reuse: renting with a known customer number reuses that customer. The same number with a different name is rejected rather than overwriting the stored name.
+- Database-side paging and filtering for vehicle and rental lists.
+- Customer rules: renting by customer number reuses the customer, and the same number with a different name is rejected rather than overwriting the stored name.
 - Clear error types for not-found and conflict cases.
 
 **Infrastructure layer** (`VehicleRental.Infrastructure`)
@@ -49,41 +52,46 @@ Through a text menu, the console client can:
 - Repository and unit-of-work implementations. Searches are filtered in SQL, and read-only queries are not tracked.
 - Unique business keys, foreign keys that never cascade-delete rental history, CHECK constraints and explicit decimal precision.
 - Optimistic concurrency (PostgreSQL row version) plus a database rule allowing only one active rental per vehicle, so two requests cannot both rent the same vehicle.
-- A versioned `InitialCreate` migration. Migrations are applied explicitly; the app never changes the schema on its own.
+- A versioned `InitialCreate` migration. Migrations are applied explicitly; neither the API nor the console client changes the schema on its own.
 
-See [ADR 001](docs/architecture/001-postgresql-persistence.md) for the reasoning behind these choices.
+**Console client** (`VehicleRental.Console`): a text menu for listing, searching, renting and returning vehicles and viewing the history. It remains as a secondary demo client.
+
+See [ADR 001](docs/architecture/001-postgresql-persistence.md) for the reasoning behind the persistence choices.
 
 ## Current Architecture
 
-- C# on .NET 10, EF Core 10, PostgreSQL
+- C# on .NET 10, ASP.NET Core Minimal APIs, EF Core 10, PostgreSQL
 - Strategy Pattern for pricing (`IVehiclePricingStrategy` and its implementations)
+- Built-in dependency injection; the API is the composition root
 - Dependencies point inward:
 
 ```
-VehicleRental.Console --> VehicleRental.Application --> VehicleRental.Domain
-        |                          ^                          ^
-        v                          |                          |
-        +-------> VehicleRental.Infrastructure ---------------+
+                 +-- Console
+                 |
+Clients --HTTP--> API --> Application --> Domain
+                 |           ^              ^
+                 +--> Infrastructure -------+
                           |
                           v
-                     PostgreSQL
+                      PostgreSQL
 ```
 
 | Project | Role |
 |---------|------|
 | `src/VehicleRental.Domain` | Entities, enums and pricing rules. No framework dependencies. |
-| `src/VehicleRental.Application` | Use cases, repository abstractions and DTOs. No database dependencies. |
-| `src/VehicleRental.Infrastructure` | EF Core, PostgreSQL mapping, repositories, migrations. |
-| `src/VehicleRental.Console` | Temporary text-based client and composition root. |
+| `src/VehicleRental.Application` | Use cases, repository abstractions and DTOs. No database or web dependencies. |
+| `src/VehicleRental.Infrastructure` | EF Core, PostgreSQL mapping, repositories, migrations, health check. |
+| `src/VehicleRental.Api` | HTTP endpoints, request validation, error handling, OpenAPI, health checks. |
+| `src/VehicleRental.Console` | Secondary text-based client. |
 | `tests/VehicleRental.Domain.Tests` | Unit tests for the domain. |
 | `tests/VehicleRental.Application.Tests` | Unit tests for the use cases, using in-memory fakes. |
 | `tests/VehicleRental.Infrastructure.IntegrationTests` | Mapping and migration tests, plus PostgreSQL integration tests. |
+| `tests/VehicleRental.Api.Tests` | Tests of the real HTTP pipeline, some against PostgreSQL. |
 
 ## Development Roadmap
 
 Planned work, none of which exists yet:
 
-- ASP.NET Core Web API
 - Authentication and authorization
 - Booking and availability checking
 - Docker and CI
@@ -91,27 +99,27 @@ Planned work, none of which exists yet:
 
 ## Running Locally
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, to run the app or the database tests, a PostgreSQL server (version 13 or later).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, to run the API, the console client or the database tests, a PostgreSQL server (version 13 or later).
 
 ```bash
 dotnet build VehicleRentalManagementSystem.slnx
 dotnet test VehicleRentalManagementSystem.slnx
 ```
 
-Building and testing need no database: the database tests are reported as skipped until you configure one (see below).
+Building and testing need no database: tests that need one are reported as skipped until you configure one (see below).
 
 ### Database setup
 
 1. Create an empty database and a login for it on your PostgreSQL server, for example `vehiclerental`.
-2. Store the connection string outside the repository. User secrets are the simplest way:
+2. Store the connection string outside the repository. User secrets are the simplest way, and one command serves both the API and the console client:
 
    ```bash
    dotnet user-secrets set "ConnectionStrings:VehicleRentalDatabase" \
      "Host=localhost;Port=5432;Database=vehiclerental;Username=<user>;Password=<password>" \
-     --project src/VehicleRental.Console
+     --project src/VehicleRental.Api
    ```
 
-   You can instead set the `ConnectionStrings__VehicleRentalDatabase` environment variable, or create a git-ignored `src/VehicleRental.Console/appsettings.Local.json` based on `appsettings.example.json`. Never commit real credentials.
+   You can instead set the `ConnectionStrings__VehicleRentalDatabase` environment variable, or (console only) create a git-ignored `src/VehicleRental.Console/appsettings.Local.json` based on `appsettings.example.json`. Never commit real credentials.
 
 3. Apply the migrations (the EF Core tool is pinned in `dotnet-tools.json`):
 
@@ -121,21 +129,29 @@ Building and testing need no database: the database tests are reported as skippe
    dotnet ef database update --project src/VehicleRental.Infrastructure
    ```
 
-4. Run the console client:
-
-   ```bash
-   dotnet run --project src/VehicleRental.Console
-   ```
-
 To add a migration after changing the model:
 
 ```bash
 dotnet ef migrations add <Name> --project src/VehicleRental.Infrastructure --output-dir Persistence/Migrations
 ```
 
+### Run the API
+
+```bash
+dotnet run --project src/VehicleRental.Api
+```
+
+It listens on `http://localhost:5270` (change with `ASPNETCORE_URLS`). In Development, open <http://localhost:5270/scalar/v1> for the interactive API reference, or fetch `/openapi/v1.json`. Check `http://localhost:5270/health` to confirm the database is ready. If the schema is not migrated, the API still starts, logs a warning, and `/health` answers 503.
+
+### Run the console client
+
+```bash
+dotnet run --project src/VehicleRental.Console
+```
+
 ### Database integration tests
 
-The PostgreSQL tests create their own temporary database, apply the migrations to it, and drop it afterwards, so they never touch your application database. Point them at a server where your login may create databases:
+The PostgreSQL tests (in the infrastructure and API test projects) create their own temporary databases, apply the migrations to them, and drop them afterwards, so they never touch your application database. Point them at a server where your login may create databases:
 
 ```bash
 # bash
@@ -143,14 +159,14 @@ export VEHICLERENTAL_TEST_CONNECTION="Host=localhost;Port=5432;Username=<user>;P
 # PowerShell
 $env:VEHICLERENTAL_TEST_CONNECTION = "Host=localhost;Port=5432;Username=<user>;Password=<password>"
 
-dotnet test tests/VehicleRental.Infrastructure.IntegrationTests
+dotnet test VehicleRentalManagementSystem.slnx
 ```
 
 Without that variable, those tests are skipped and the rest of the suite still runs.
 
 ## Project Status
 
-Active portfolio redevelopment. The application is still a console prototype, now backed by PostgreSQL. There is no web API, authentication or frontend yet.
+Active portfolio redevelopment. The platform has a working, tested HTTP API on PostgreSQL. It has no authentication, frontend, Docker setup or CI yet.
 
 ## License
 
