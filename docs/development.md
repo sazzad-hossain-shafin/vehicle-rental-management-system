@@ -84,3 +84,27 @@ dotnet test VehicleRentalManagementSystem.slnx
 ```
 
 Without that variable, those tests are skipped and the rest of the suite still runs.
+
+## Contributing workflow
+
+Changes reach `main` only through pull requests; the `Protect main` ruleset rejects direct pushes.
+
+```text
+main -> feature or fix branch -> commits -> push branch -> pull request -> GitHub Actions -> merge
+```
+
+```bash
+git switch main && git pull --ff-only
+git switch -c fix/short-description
+
+# edit, then run the checks that CI runs (see docs/ci.md)
+git add -A
+git commit -m "Describe the change"
+git push -u origin fix/short-description
+gh pr create --fill          # or open the pull request in the browser
+```
+
+The pull request must pass the three required checks (Quality checks, Build and test, Docker build and compose smoke test) and be up to date with `main` before it can be merged. Use **Squash and merge** to keep `main` readable, then update your clone with `git switch main && git pull --ff-only`.
+
+Dependabot opens pull requests for NuGet packages, GitHub Actions and Docker images. Review each one (release notes, and for a major version any breaking changes), check that its CI run is green on the current `main`, and merge them one at a time. Dependabot does not merge anything itself.
+
