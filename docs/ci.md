@@ -26,6 +26,16 @@ Without that variable the database tests are **skipped**, and `dotnet test` stil
 
 The *Docker* job generates a random `.env` with `scripts/init-env.sh` (values are masked in logs), validates and builds `compose.yaml` (the API and the migration image), starts the stack, and waits up to four minutes for PostgreSQL, the migration job and the API to be ready (`scripts/ci/wait-for-stack.sh`; it fails immediately if migration or the API exits). It then runs `scripts/smoke-test.sh`. On failure, container status and the last 300 log lines are uploaded as `compose-diagnostics`. Containers, networks and volumes are always removed.
 
+## Branch protection
+
+The `Protect main` repository ruleset applies to `main` only. It blocks deletion and force pushes, requires changes to go through a pull request (no approving review is required, since there is a single maintainer; review threads must be resolved), and requires these checks to pass on a branch that is up to date with `main`:
+
+- Quality checks
+- Build and test
+- Docker build and compose smoke test
+
+There is no bypass actor, so even the owner uses pull requests. If CI itself is broken, the owner can still edit the ruleset in the repository settings. The workflow has no path filters, so every pull request reports all three checks. Action versions are updated by Dependabot pull requests that keep the full commit SHA pinning.
+
 ## Policies
 
 - **Vulnerabilities**: `scripts/ci/check-vulnerabilities.py` uses `dotnet list package --vulnerable --include-transitive`. High and Critical findings fail the build; Moderate and Low are annotated as warnings; outdated packages never fail it. If the vulnerability data cannot be read, the check fails instead of passing silently.

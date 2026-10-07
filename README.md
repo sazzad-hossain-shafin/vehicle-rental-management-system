@@ -194,7 +194,7 @@ The GitHub Actions workflow in [.github/workflows/ci.yml](.github/workflows/ci.y
 - all tests against a PostgreSQL 17 service container, failing if any test is skipped
 - the Docker images, Compose startup, migration and the HTTP smoke test
 
-**Status:** the workflow runs on GitHub-hosted runners; see the badge above and the [Actions tab](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions). Its first hosted run found one real Linux-only defect (a culture-dependent pricing name), which was fixed. See [docs/ci.md](docs/ci.md).
+**Status:** the workflow runs on GitHub-hosted runners; see the badge above and the [Actions tab](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions). Its first hosted run found one real Linux-only defect (a culture-dependent pricing name), which was fixed. Changes to `main` go through pull requests with these checks required; see [docs/ci.md](docs/ci.md) and the [contributing workflow](docs/development.md#contributing-workflow).
 
 ## Repository layout
 
