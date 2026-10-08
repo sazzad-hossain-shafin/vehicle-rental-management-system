@@ -23,6 +23,16 @@ Authorization: Bearer <JWT>
 - A token holds only: the account ID (`sub`), a token ID, the role(s), and for customer accounts the customer ID (`customer_id`), plus issuer, audience and times. No email, no name, no password data.
 - Every protected request is checked in the API. Anything not explicitly marked anonymous requires a sign-in, so a new endpoint cannot be left open by accident. (This also means unknown paths answer 401 to anonymous callers.)
 
+## Browser sessions
+
+The [customer website](frontend.md) signs in with `POST /auth/session` instead of `/auth/login`:
+
+- The server sets the access token as an **HttpOnly, SameSite=Strict** cookie (`vr_session`, `Path=/api`, expiring with the token, `Secure` over HTTPS or when `Session:ForceSecureCookie=true`). The response body contains the user and the expiry, not the token, so page scripts can never read it.
+- The JWT handler reads the token from the cookie only when the request has no `Authorization` header. The token, its validation and every authorization rule are the same as for bearer clients.
+- **CSRF:** browsers attach cookies automatically, so a write authenticated by the cookie must carry `X-Requested-With: VehicleRentalWeb` (a cross-site page cannot add a custom header without CORS, and this API enables no CORS). Sign-in and sign-out require the header as well. Bearer requests are unaffected.
+- `DELETE /auth/session` removes the cookie from the browser. Tokens are stateless and cannot be revoked, so a copy of the token would stay valid until it expires (30 minutes). There are no refresh tokens: after expiry the site asks the customer to sign in again.
+- The website must be served from the same origin as the API (nginx in Compose, the Vite proxy in development).
+
 ## Roles
 
 | Role | Who | Can do |
@@ -49,7 +59,7 @@ Several policies currently have the same roles; they are separate so they can di
 | Endpoint | Access |
 |----------|--------|
 | `GET /health`, `GET /health/live` | Anonymous |
-| `POST /auth/login`, `POST /auth/register` | Anonymous |
+| `POST /auth/login`, `POST /auth/register`, `POST /auth/session`, `DELETE /auth/session` | Anonymous (the session endpoints require the anti-CSRF header) |
 | `GET /vehicles`, `GET /vehicles/{id}`, `GET /vehicles/by-registration/{n}` | Anonymous (browsing the fleet is public) |
 | `POST /vehicles` | Staff, Admin |
 | `POST /customers`, `GET /customers/{id}`, `GET /customers/by-number/{n}` | Staff, Admin |
@@ -58,7 +68,7 @@ Several policies currently have the same roles; they are separate so they can di
 | `POST /admin/staff` | Admin only |
 | `GET /me` | Any signed-in account |
 | `GET /me/customer`, `GET /me/rentals` | Customer accounts only |
-| `GET /vehicles/availability` | Any signed-in account |
+| `GET /vehicles/availability`, `GET /vehicles/{id}/quote` | Anonymous (like browsing: they reveal only which vehicles are free and the price) |
 | `POST /me/reservations`, `GET /me/reservations`, `GET /me/reservations/{id}`, `POST /me/reservations/{id}/cancel` | Customer accounts only; always the caller's own data |
 | `POST /reservations`, `GET /reservations`, `GET /reservations/{id}`, `POST /reservations/{id}/cancel`, `POST /reservations/{id}/pickup` | Staff, Admin |
 | `/openapi/v1.json`, `/scalar/v1` | Anonymous, Development only |

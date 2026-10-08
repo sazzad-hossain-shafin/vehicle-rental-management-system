@@ -9,6 +9,8 @@ The workflow in [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs on 
 | Quality checks | in parallel | Repository hygiene, formatting, NuGet vulnerabilities |
 | Build and test | in parallel | Release build, all tests against PostgreSQL, skipped-test guard |
 | Docker build and compose smoke test | after *Build and test* | Image builds, Compose stack, smoke test |
+| Frontend checks | in parallel | Typecheck, lint, unit tests, build, npm audit |
+| Frontend end-to-end | after *Frontend checks* | Playwright against the full stack |
 
 All jobs run on `ubuntu-latest` with a timeout. Actions are pinned to full commit SHAs (the release is in a comment); Dependabot keeps them current.
 
@@ -25,6 +27,11 @@ Without that variable the database tests are **skipped**, and `dotnet test` stil
 ## Docker verification
 
 The *Docker* job generates a random `.env` with `scripts/init-env.sh` (values are masked in logs), validates and builds `compose.yaml` (the API and the migration image), starts the stack, and waits up to four minutes for PostgreSQL, the migration job and the API to be ready (`scripts/ci/wait-for-stack.sh`; it fails immediately if migration or the API exits). It then runs `scripts/smoke-test.sh`. On failure, container status and the last 300 log lines are uploaded as `compose-diagnostics`. Containers, networks and volumes are always removed.
+
+## Frontend jobs
+
+- **Frontend checks:** Node 24 (pinned by `frontend/.nvmrc`), `npm ci` from the lockfile, strict typecheck, ESLint, the Vitest tests, the production build, and `npm audit --audit-level=high` (high or critical advisories fail; this mirrors the NuGet policy).
+- **Frontend end-to-end:** starts the full Compose stack (database, migrations, API and website) with throwaway secrets, installs Chromium, and runs the Playwright tests against it. On failure the Playwright report and container logs are uploaded. The stack and its volumes are always removed.
 
 ## Branch protection
 

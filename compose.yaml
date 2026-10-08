@@ -90,6 +90,31 @@ services:
       - no-new-privileges:true
     stop_grace_period: 30s
 
+  # The customer website: static files served by an unprivileged nginx, which also forwards /api/ to the API so the
+  # browser talks to a single origin (this is what makes the HttpOnly session cookie work without CORS).
+  # Open http://localhost:8081 (change with WEB_PORT). The API stays reachable on its own port as before.
+  web:
+    build:
+      context: ./frontend
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 5s
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   # The database files. Survives "docker compose down"; deleted only by "docker compose down -v".
   pgdata:

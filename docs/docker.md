@@ -73,6 +73,10 @@ Rules the setup follows:
 - **Required secrets have no default.** If `POSTGRES_PASSWORD` or `JWT_SIGNING_KEY` is missing, Compose stops with a message naming it. There is no generated or example key to fall back on, and the API's own checks (a strong key, an issuer and audience) are unchanged.
 - The API reads its configuration from environment variables (`ConnectionStrings__VehicleRentalDatabase`, `Jwt__SigningKey`, `Seed__Admin__Email`, ...). The database host is the Compose service name, `postgres`, not `localhost`.
 
+## The website
+
+The `web` service builds `frontend/` (Node 24) and serves it with an unprivileged nginx on <http://localhost:8081> (`WEB_PORT`). nginx forwards `/api/` to the API, sets a strict Content-Security-Policy and other security headers, and the container runs read-only with all capabilities dropped, like the API. It starts after the API is healthy. The API stays published on its own port, so API-only use is unchanged.
+
 ## Database migrations
 
 The API **never changes the database schema itself**. A separate one-shot service does:

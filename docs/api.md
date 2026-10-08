@@ -67,7 +67,8 @@ A reservation holds a vehicle for the half-open date range `[startDate, endDate)
 
 | Method | Route | Access | Purpose | Success |
 |--------|-------|--------|---------|---------|
-| GET | `/vehicles/availability?startDate=&endDate=` | Signed in | Vehicles free for the period (paged; `vehicleType`, `maxDailyRate`) | 200 |
+| GET | `/vehicles/availability?startDate=&endDate=` | Public | Vehicles free for the period (paged; `vehicleType`, `maxDailyRate`) | 200 |
+| GET | `/vehicles/{id}/quote?startDate=&endDate=` | Public | The price the pricing policy would quote, and whether the vehicle is free right now. Reserves nothing, and is not a guarantee | 200 |
 | POST | `/me/reservations` | Customer | Reserve a vehicle for the signed-in customer (body: `vehicleId`, `startDate`, `endDate`) | 201 + `Location` |
 | GET | `/me/reservations` | Customer | My reservations (paged) | 200 |
 | GET | `/me/reservations/{id}` | Customer | One of my reservations (someone else's is a 404) | 200 |
@@ -91,6 +92,8 @@ POST /api/v1/me/reservations
 The customer is never sent: it comes from the signed token. Overlapping an active reservation or rental, cancelling something that is not active, and picking up twice are 409s (as is losing a race to another booking of the same vehicle, which can simply be retried); invalid or past dates are 400s.
 
 ### Accounts and sign-in
+
+Two ways to sign in. `POST /auth/login` returns the token in the body for API clients (send it as `Authorization: Bearer`). `POST /auth/session` is for browsers: it sets the same token as an HttpOnly, SameSite=Strict cookie scoped to `/api` and returns only `{ "expiresAtUtc", "user" }`; `DELETE /auth/session` clears it. Both session endpoints, and any state-changing request authenticated by the cookie, require the header `X-Requested-With: VehicleRentalWeb` (otherwise 403). See [authentication](authentication.md#browser-sessions).
 
 | Method | Route | Access | Purpose | Success |
 |--------|-------|--------|---------|---------|

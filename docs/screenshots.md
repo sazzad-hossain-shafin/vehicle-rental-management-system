@@ -1,6 +1,6 @@
 # Screenshots
 
-No screenshots are committed yet. A fake or edited screenshot would misrepresent the project, so add them only from a real run, and review each one before committing.
+No screenshots are committed yet. The customer website (see [frontend](frontend.md)) can now be captured from a throwaway stack. A fake or edited screenshot would misrepresent the project, so add them only from a real run, and review each one before committing.
 
 ## Worth capturing
 

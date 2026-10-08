@@ -6,7 +6,7 @@
 #
 # It signs in as the configured admin, creates a staff account, two customers, two vehicles and two rentals
 # with unique names (so it can be run repeatedly), and checks health, public access, 401/403, customer
-# ownership and the reservation flow (availability, booking, overlap, cancellation, pickup). It prints only pass/fail lines: never passwords or tokens. Exit status is non-zero on any failure.
+# ownership, the reservation flow (availability, quote, booking, overlap, cancellation, pickup) and the browser cookie session. It prints only pass/fail lines: never passwords or tokens. Exit status is non-zero on any failure.
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -85,7 +85,9 @@ add_days() { date -u -d "$1 + $2 days" +%F 2>/dev/null || date -u -j -v+"$2"d -f
 d3="$(add_days "$today" 3)"; d6="$(add_days "$today" 6)"; d8="$(add_days "$today" 8)"; d2="$(add_days "$today" 2)"
 vehicle_c="$(get -X POST "$base/api/v1/vehicles" -H "$json" -H "Authorization: Bearer $staff" -d "{\"registrationNumber\":\"C-$run\",\"make\":\"Mazda\",\"model\":\"3\",\"year\":2023,\"vehicleType\":\"Car\",\"dailyRate\":50}" | field id)"
 bob="$(login "$bob_email" "$bob_password")"
-check "availability needs a sign-in" 401 "$(status "$base/api/v1/vehicles/availability?startDate=$d3&endDate=$d6")"
+check "availability is public, like browsing vehicles" 200 "$(status "$base/api/v1/vehicles/availability?startDate=$d3&endDate=$d6")"
+check "the quote is public and priced by the server (3 days at 50 = 150.00)" 150.00 "$(get "$base/api/v1/vehicles/$vehicle_c/quote?startDate=$d3&endDate=$d6" | sed -n 's/.*"totalCost":\([0-9.]*\).*/\1/p')"
+check "a quote for an end date before the start is a 400" 400 "$(status "$base/api/v1/vehicles/$vehicle_c/quote?startDate=$d6&endDate=$d3")"
 check "a customer finds the free vehicle for the dates" 1 "$(get "$base/api/v1/vehicles/availability?startDate=$d3&endDate=$d6" -H "Authorization: Bearer $alice" | grep -c "$vehicle_c")"
 check "availability rejects an end date before the start" 400 "$(status "$base/api/v1/vehicles/availability?startDate=$d6&endDate=$d3" -H "Authorization: Bearer $alice")"
 reservation_json="$(get -X POST "$base/api/v1/me/reservations" -H "$json" -H "Authorization: Bearer $alice" -d "{\"vehicleId\":\"$vehicle_c\",\"startDate\":\"$d3\",\"endDate\":\"$d6\",\"customerId\":\"$bob_customer\"}")"
@@ -106,6 +108,20 @@ check "staff books at the desk for a customer" Active "$(get "$base/api/v1/reser
 check "a customer cannot pick up a reservation" 403 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $alice")"
 check "staff pick up the reservation (starts the rental)" 200 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $staff")"
 check "picking up twice is a conflict" 409 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $staff")"
+
+echo "Browser session (HttpOnly cookie)"
+csrf='X-Requested-With: VehicleRentalWeb'
+cookie_file="$(mktemp)"
+trap 'rm -f "$cookie_file"' EXIT
+session_headers="$(curl -s -m 20 -D - -o /dev/null -c "$cookie_file" -X POST "$base/api/v1/auth/session" -H "$json" -H "$csrf" -d "{\"email\":\"$alice_email\",\"password\":\"$alice_password\"}")"
+check "cookie sign-in succeeds" yes "$(echo "$session_headers" | grep -q '^HTTP/.* 200' && echo yes || echo no)"
+check "the session cookie is HttpOnly and SameSite=Strict" yes "$(echo "$session_headers" | grep -i '^set-cookie: vr_session=' | grep -qi 'httponly' && echo "$session_headers" | grep -i '^set-cookie: vr_session=' | grep -qi 'samesite=strict' && echo yes || echo no)"
+check "the cookie identifies the customer" 200 "$(status -b "$cookie_file" "$base/api/v1/me")"
+check "a state-changing request with the cookie but no CSRF header is refused" 403 "$(status -b "$cookie_file" -X POST "$base/api/v1/me/reservations/00000000-0000-0000-0000-000000000000/cancel")"
+check "with the CSRF header it passes the check (and the id does not exist)" 404 "$(status -b "$cookie_file" -H "$csrf" -X POST "$base/api/v1/me/reservations/00000000-0000-0000-0000-000000000000/cancel")"
+check "signing out is refused without the CSRF header" 403 "$(status -b "$cookie_file" -X DELETE "$base/api/v1/auth/session")"
+check "signing out clears the cookie" 204 "$(status -b "$cookie_file" -c "$cookie_file" -H "$csrf" -X DELETE "$base/api/v1/auth/session")"
+check "after signing out the cookie is gone" 401 "$(status -b "$cookie_file" "$base/api/v1/me")"
 
 echo
 if [[ $failures -eq 0 ]]; then echo "All checks passed."; else echo "$failures check(s) FAILED."; fi

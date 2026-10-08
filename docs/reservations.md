@@ -45,6 +45,8 @@ A vehicle is **free for a period** when it has no active reservation overlapping
 
 ## Customer flow
 
+The [customer website](frontend.md) implements this flow end to end. Availability search and the price quote (`GET /vehicles/{id}/quote`) are public; reserving needs a sign-in.
+
 1. `GET /api/v1/vehicles/availability?startDate=2026-11-10&endDate=2026-11-13` to find free vehicles.
 2. `POST /api/v1/me/reservations` with `vehicleId`, `startDate`, `endDate`. There is no customer field: the customer is the signed-in one, taken from the token.
 3. `GET /api/v1/me/reservations` and `GET /api/v1/me/reservations/{id}` to review. Another customer's reservation answers 404, exactly like one that does not exist.
