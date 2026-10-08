@@ -30,6 +30,25 @@ internal static class JwtBearerSetup
                 // Keep the claim names exactly as issued ("sub", "role") instead of renaming them.
                 bearer.MapInboundClaims = false;
 
+                // A browser session: with no Authorization header, take the same token from the HttpOnly session
+                // cookie. A bearer header always wins, so API clients are unaffected. The request is marked so the
+                // anti-CSRF check knows it was authenticated by a cookie the browser attached by itself.
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        if (string.IsNullOrEmpty(context.Request.Headers.Authorization)
+                            && context.Request.Cookies.TryGetValue(SessionCookie.Name, out string? token)
+                            && !string.IsNullOrEmpty(token))
+                        {
+                            context.Token = token;
+                            context.HttpContext.Items[SessionCookie.UsedKey] = true;
+                        }
+
+                        return Task.CompletedTask;
+                    }
+                };
+
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,

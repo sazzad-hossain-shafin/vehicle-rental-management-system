@@ -22,6 +22,31 @@ internal static class AuthEndpoints
             .Produces<LoginResponse>()
             .ProducesProblem(StatusCodes.Status401Unauthorized);
 
+        auth.MapPost("/session", StartSessionAsync)
+            .WithName("StartSession")
+            .WithSummary("Signs in a browser: sets an HttpOnly session cookie")
+            .WithDescription(
+                "Same credentials and the same 401 behaviour as /auth/login, but the access token is returned only " +
+                "as an HttpOnly, SameSite=Strict cookie that scripts cannot read. Requires the " +
+                "X-Requested-With: VehicleRentalWeb header. Meant for a web client served from the same origin.")
+            .AllowAnonymous()
+            .RequireCsrfHeader()
+            .WithRequestValidation<LoginRequest>()
+            .Produces<SessionResponse>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
+        auth.MapDelete("/session", EndSession)
+            .WithName("EndSession")
+            .WithSummary("Signs a browser out: clears the session cookie")
+            .WithDescription(
+                "Tokens are stateless and cannot be revoked, so this removes the cookie from the browser; a copy of " +
+                "the token would stay valid until it expires (30 minutes). Requires the X-Requested-With header.")
+            .AllowAnonymous()
+            .RequireCsrfHeader()
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status403Forbidden);
+
         auth.MapPost("/register", RegisterCustomerAsync)
             .WithName("RegisterCustomer")
             .WithSummary("Creates a customer account")
@@ -65,6 +90,34 @@ internal static class AuthEndpoints
         }
 
         return Results.Ok(new LoginResponse(result.AccessToken, "Bearer", result.ExpiresAtUtc, result.User));
+    }
+
+    private static async Task<IResult> StartSessionAsync(
+        LoginRequest request,
+        HttpContext http,
+        IAccountService accounts,
+        CancellationToken cancellationToken)
+    {
+        LoginResult? result = await accounts.LoginAsync(request.Email!, request.Password!, cancellationToken);
+
+        if (result is null)
+        {
+            return Results.Problem(
+                statusCode: StatusCodes.Status401Unauthorized,
+                title: "Authentication failed.",
+                detail: "The email or password is incorrect.");
+        }
+
+        SessionCookie.Append(http, result.AccessToken, result.ExpiresAtUtc);
+
+        return Results.Ok(new SessionResponse(result.ExpiresAtUtc, result.User));
+    }
+
+    private static IResult EndSession(HttpContext http)
+    {
+        SessionCookie.Delete(http);
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> RegisterCustomerAsync(

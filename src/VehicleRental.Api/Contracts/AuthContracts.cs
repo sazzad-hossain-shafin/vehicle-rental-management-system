@@ -51,6 +51,14 @@ public sealed class CreateStaffRequest
     public string? Password { get; init; }
 }
 
+/// <summary>
+/// A successful browser sign-in. The access token is not in the body: it is set as an <c>HttpOnly</c> cookie that
+/// scripts cannot read.
+/// </summary>
+/// <param name="ExpiresAtUtc">When the session stops being valid. Sign in again after that.</param>
+/// <param name="User">The account that signed in.</param>
+public sealed record SessionResponse(DateTimeOffset ExpiresAtUtc, UserDto User);
+
 /// <summary>A successful sign-in.</summary>
 /// <param name="AccessToken">Send as <c>Authorization: Bearer {accessToken}</c>.</param>
 /// <param name="TokenType">Always "Bearer".</param>

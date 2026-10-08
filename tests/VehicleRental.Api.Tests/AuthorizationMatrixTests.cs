@@ -42,7 +42,6 @@ public class AuthorizationMatrixTests : IDisposable
         new("GET", "/api/v1/me", null, Everyone),
         new("GET", "/api/v1/me/customer", null, [Roles.Customer]),
         new("GET", "/api/v1/me/rentals", null, [Roles.Customer]),
-        new("GET", "/api/v1/vehicles/availability?startDate=2030-01-10&endDate=2030-01-12", null, Everyone),
         new("POST", "/api/v1/reservations", new { customerId = SomeId, vehicleId = SomeId, startDate = "2030-01-10", endDate = "2030-01-12" }, StaffAndAdmin),
         new("GET", "/api/v1/reservations", null, StaffAndAdmin),
         new("GET", $"/api/v1/reservations/{SomeId}", null, StaffAndAdmin),
@@ -176,6 +175,8 @@ public class AuthorizationMatrixTests : IDisposable
     [InlineData("/api/v1/vehicles")]
     [InlineData("/api/v1/vehicles/00000000-0000-0000-0000-000000000001")]
     [InlineData("/api/v1/vehicles/by-registration/ABC-123")]
+    [InlineData("/api/v1/vehicles/availability?startDate=2030-01-10&endDate=2030-01-12")]
+    [InlineData("/api/v1/vehicles/00000000-0000-0000-0000-000000000001/quote?startDate=2030-01-10&endDate=2030-01-12")]
     public async Task VehicleBrowsing_NeedsNoToken(string url)
     {
         using var anonymous = _factory.CreateClient();
@@ -230,10 +231,14 @@ public class AuthorizationMatrixTests : IDisposable
                 "ANY /health",          // health checks answer any HTTP method
                 "ANY /health/live",
                 "GET /api/v1/vehicles",
+                "GET /api/v1/vehicles/availability",   // like browsing: reveals only which vehicles are free
                 "GET /api/v1/vehicles/by-registration/{registrationNumber}",
                 "GET /api/v1/vehicles/{id}",
+                "GET /api/v1/vehicles/{id}/quote",
                 "POST /api/v1/auth/login",
-                "POST /api/v1/auth/register"
+                "POST /api/v1/auth/register",
+                "POST /api/v1/auth/session",           // signs in; the anti-CSRF header is its check
+                "DELETE /api/v1/auth/session"
             }.Order(),
             anonymousApi);
 
