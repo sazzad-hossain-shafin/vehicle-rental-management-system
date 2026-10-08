@@ -29,7 +29,7 @@ Authorization: Bearer <JWT>
 |------|-----|--------|
 | **Admin** | The business owner | Everything Staff can, plus create staff accounts |
 | **Staff** | Rental-desk employees | Add vehicles, register and look up customers, start and return rentals, read the whole rental history |
-| **Customer** | An online customer | Read their own profile and their own rentals. Nothing else |
+| **Customer** | An online customer | Read their own profile and rentals; search availability; make, read and cancel their own reservations. Nothing else |
 
 Role names live in one place (`Roles` in the Application project). Endpoints name a **policy** (a capability), not roles:
 
@@ -38,6 +38,7 @@ Role names live in one place (`Roles` in the Application project). Endpoints nam
 | `FleetManage` | Staff, Admin |
 | `CustomerManage` | Staff, Admin |
 | `RentalManage` | Staff, Admin |
+| `ReservationManage` | Staff, Admin |
 | `UserAdministration` | Admin |
 | `CustomerSelfService` | Customer (and the token must carry a customer ID) |
 
@@ -57,6 +58,9 @@ Several policies currently have the same roles; they are separate so they can di
 | `POST /admin/staff` | Admin only |
 | `GET /me` | Any signed-in account |
 | `GET /me/customer`, `GET /me/rentals` | Customer accounts only |
+| `GET /vehicles/availability` | Any signed-in account |
+| `POST /me/reservations`, `GET /me/reservations`, `GET /me/reservations/{id}`, `POST /me/reservations/{id}/cancel` | Customer accounts only; always the caller's own data |
+| `POST /reservations`, `GET /reservations`, `GET /reservations/{id}`, `POST /reservations/{id}/cancel`, `POST /reservations/{id}/pickup` | Staff, Admin |
 | `/openapi/v1.json`, `/scalar/v1` | Anonymous, Development only |
 
 A test enumerates every mapped endpoint and fails if one is neither on this list nor deliberately anonymous.
@@ -75,10 +79,11 @@ Identity (the login) and the customer (the business record) are separate things,
 
 How a customer is kept to their own data:
 
-1. The customer ID comes **only from the signed token**, never from a URL, query string, header or body. `/me/customer` and `/me/rentals` take no ID at all.
+1. The customer ID comes **only from the signed token**, never from a URL, query string, header or body. `/me/customer`, `/me/rentals` and `/me/reservations` take no customer ID at all: booking a reservation has no customer field, so there is nothing to tamper with.
 2. `GET /rentals/{id}` for a customer filters by their customer ID in the database query. Someone else's rental is answered **404**, identical to a rental that does not exist, so IDs cannot be probed.
 3. Staff-only endpoints answer 403 to customers, including for the customer's own ID (they use `/me/...`).
 4. The customer-scoped history query counts and pages only that customer's rows.
+5. Another customer's reservation (read or cancel) is answered **404**, identical to one that does not exist. A customer cannot book for someone else, cannot ask for the promotional discount, and cannot reach the desk endpoints (list all, pick up) at all.
 
 ## Accounts
 
@@ -137,6 +142,6 @@ Authentication and authorization failures are Problem Details like every other e
 - **No email verification, password reset or change-password flow**, and no multi-factor authentication or social login.
 - **Registration reveals whether an email is taken** (a 409), as most sign-up forms do. Login does not.
 - **No rate limiting** beyond account lockout. Lockout can be used to lock a victim's account out for 15 minutes.
-- **Customer self-service is read-only.** Booking, and customers starting their own rentals, belong to a later phase.
+- **Customers can reserve but not start rentals.** A reservation is a booking; the vehicle is handed over, and the rental started, by staff at pickup.
 - The signing key is symmetric (HMAC), so every service that verifies tokens holds the secret. A multi-service setup would move to asymmetric keys.
 

@@ -5,8 +5,8 @@
 #   BASE_URL=http://localhost:8080 ADMIN_EMAIL=... ADMIN_PASSWORD=... scripts/smoke-test.sh
 #
 # It signs in as the configured admin, creates a staff account, two customers, two vehicles and two rentals
-# with unique names (so it can be run repeatedly), and checks health, public access, 401/403 and customer
-# ownership. It prints only pass/fail lines: never passwords or tokens. Exit status is non-zero on any failure.
+# with unique names (so it can be run repeatedly), and checks health, public access, 401/403, customer
+# ownership and the reservation flow (availability, booking, overlap, cancellation, pickup). It prints only pass/fail lines: never passwords or tokens. Exit status is non-zero on any failure.
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -77,6 +77,35 @@ check "customer's rental list holds only their own" 1 "$(get "$base/api/v1/me/re
 check "staff returns a rental" 200 "$(status -X POST "$base/api/v1/rentals/$rental_a/return" -H "Authorization: Bearer $staff")"
 check "returning twice is a conflict" 409 "$(status -X POST "$base/api/v1/rentals/$rental_a/return" -H "Authorization: Bearer $staff")"
 check "invalid request is a 400" 400 "$(status -X POST "$base/api/v1/vehicles" -H "$json" -H "Authorization: Bearer $staff" -d '{}')"
+
+echo "Reservation flow"
+# Dates are relative to the API's own "today", which the rental above reported, so a different time zone cannot matter.
+today="$(echo "$rental_a_json" | field startDate)"
+add_days() { date -u -d "$1 + $2 days" +%F 2>/dev/null || date -u -j -v+"$2"d -f %F "$1" +%F; }
+d3="$(add_days "$today" 3)"; d6="$(add_days "$today" 6)"; d8="$(add_days "$today" 8)"; d2="$(add_days "$today" 2)"
+vehicle_c="$(get -X POST "$base/api/v1/vehicles" -H "$json" -H "Authorization: Bearer $staff" -d "{\"registrationNumber\":\"C-$run\",\"make\":\"Mazda\",\"model\":\"3\",\"year\":2023,\"vehicleType\":\"Car\",\"dailyRate\":50}" | field id)"
+bob="$(login "$bob_email" "$bob_password")"
+check "availability needs a sign-in" 401 "$(status "$base/api/v1/vehicles/availability?startDate=$d3&endDate=$d6")"
+check "a customer finds the free vehicle for the dates" 1 "$(get "$base/api/v1/vehicles/availability?startDate=$d3&endDate=$d6" -H "Authorization: Bearer $alice" | grep -c "$vehicle_c")"
+check "availability rejects an end date before the start" 400 "$(status "$base/api/v1/vehicles/availability?startDate=$d6&endDate=$d3" -H "Authorization: Bearer $alice")"
+reservation_json="$(get -X POST "$base/api/v1/me/reservations" -H "$json" -H "Authorization: Bearer $alice" -d "{\"vehicleId\":\"$vehicle_c\",\"startDate\":\"$d3\",\"endDate\":\"$d6\",\"customerId\":\"$bob_customer\"}")"
+reservation="$(echo "$reservation_json" | field id)"
+check "a customer reserves for themselves (3 days at 50 = 150.00)" 150.00 "$(echo "$reservation_json" | sed -n 's/.*"totalCost":\([0-9.]*\).*/\1/p')"
+check "the booking belongs to the signed-in customer, not the one in the body" "$alice_customer" "$(echo "$reservation_json" | field customerId)"
+check "an overlapping reservation is a conflict" 409 "$(status -X POST "$base/api/v1/me/reservations" -H "$json" -H "Authorization: Bearer $bob" -d "{\"vehicleId\":\"$vehicle_c\",\"startDate\":\"$d2\",\"endDate\":\"$d6\"}")"
+check "a reservation that starts when another ends is allowed" 201 "$(status -X POST "$base/api/v1/me/reservations" -H "$json" -H "Authorization: Bearer $bob" -d "{\"vehicleId\":\"$vehicle_c\",\"startDate\":\"$d6\",\"endDate\":\"$d8\"}")"
+check "another customer's reservation looks like a missing one" 404 "$(status "$base/api/v1/me/reservations/$reservation" -H "Authorization: Bearer $bob")"
+check "a customer cannot list all reservations" 403 "$(status "$base/api/v1/reservations" -H "Authorization: Bearer $alice")"
+check "a customer sees only their own reservations" 1 "$(get "$base/api/v1/me/reservations" -H "Authorization: Bearer $alice" | number totalCount)"
+check "a customer cancels their own reservation" 200 "$(status -X POST "$base/api/v1/me/reservations/$reservation/cancel" -H "Authorization: Bearer $alice")"
+check "cancelling twice is a conflict" 409 "$(status -X POST "$base/api/v1/me/reservations/$reservation/cancel" -H "Authorization: Bearer $alice")"
+check "a cancelled reservation frees its dates" 201 "$(status -X POST "$base/api/v1/me/reservations" -H "$json" -H "Authorization: Bearer $bob" -d "{\"vehicleId\":\"$vehicle_c\",\"startDate\":\"$d3\",\"endDate\":\"$d6\"}")"
+desk_json="$(get -X POST "$base/api/v1/reservations" -H "$json" -H "Authorization: Bearer $staff" -d "{\"customerId\":\"$alice_customer\",\"vehicleId\":\"$vehicle_a\",\"startDate\":\"$today\",\"endDate\":\"$d2\"}")"
+desk_reservation="$(echo "$desk_json" | field id)"
+check "staff books at the desk for a customer" Active "$(get "$base/api/v1/reservations/$desk_reservation" -H "Authorization: Bearer $staff" | field status)"
+check "a customer cannot pick up a reservation" 403 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $alice")"
+check "staff pick up the reservation (starts the rental)" 200 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $staff")"
+check "picking up twice is a conflict" 409 "$(status -X POST "$base/api/v1/reservations/$desk_reservation/pickup" -H "Authorization: Bearer $staff")"
 
 echo
 if [[ $failures -eq 0 ]]; then echo "All checks passed."; else echo "$failures check(s) FAILED."; fi
