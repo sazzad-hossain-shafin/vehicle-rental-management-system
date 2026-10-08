@@ -26,7 +26,7 @@ internal static class Mappings
     public static CustomerDto ToDto(this Customer customer) =>
         new(customer.Id, customer.CustomerNumber, customer.Name);
 
-    public static ReservationDto ToDto(this Reservation reservation) =>
+    public static ReservationDto ToDto(this Reservation reservation, DateOnly today) =>
         new(
             reservation.Id,
             reservation.Customer.Id,
@@ -46,7 +46,8 @@ internal static class Mappings
             reservation.DailyRateAtReservation,
             reservation.BillableDays,
             reservation.PricingDescription,
-            reservation.TotalCost);
+            reservation.TotalCost,
+            reservation.IsExpired(today));
 
     public static RentalDto ToDto(this Rental rental) =>
         new(

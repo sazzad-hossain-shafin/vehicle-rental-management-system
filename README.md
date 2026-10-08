@@ -11,8 +11,8 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 - **Layered architecture** with strictly inward dependencies: Domain, Application, Infrastructure and an HTTP API. The Domain has no framework dependencies, and the Application layer has no EF Core or web dependencies.
 - **PostgreSQL persistence** through EF Core with explicit migrations, unique business keys, protected rental history and a database rule that makes double-renting a vehicle impossible.
 - **Authentication and authorization** with ASP.NET Core Identity, JWT bearer tokens, Admin/Staff/Customer roles, default-deny endpoints and customer ownership checks.
-- **Reservations with a database-enforced no-double-booking guarantee**: customers reserve a vehicle for a date range, and a PostgreSQL exclusion constraint makes overlapping bookings impossible even for simultaneous requests.
-- **734 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database, and concurrency tests for double booking and double pickup.
+- **Reservations with a database-enforced no-double-booking guarantee**: customers reserve a vehicle for a date range. A PostgreSQL exclusion constraint stops overlapping reservations, and a per-vehicle row lock stops a walk-in rental and a reservation from racing each other, even across several API instances.
+- **748 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database, and concurrency tests for double booking and double pickup.
 - **One-command local environment** with Docker Compose: PostgreSQL, a one-shot migration job and the API.
 - **CI workflow** for build, tests, vulnerability policy and Docker verification. It runs on GitHub Actions on every push and pull request (see [Continuous integration](#continuous-integration)).
 
@@ -94,10 +94,11 @@ More detail, including the operational view, is in [docs/architecture/overview.m
 - **The customer comes from the signed token**, never from an ID in the request. Another customer's rental answers 404, exactly like one that does not exist.
 - **Double rental is prevented by the database**: optimistic concurrency on the PostgreSQL row version plus a partial unique index allowing one active rental per vehicle.
 - **Double booking is prevented by the database too**: a PostgreSQL exclusion constraint on the vehicle and the half-open date range `[start, end)` refuses overlapping active reservations. The application checks first for a friendly message, but the constraint has the final say.
+- **Rentals and reservations are serialised per vehicle** with a `SELECT ... FOR UPDATE` row lock taken before the availability check, so simultaneous requests (including through different API instances) cannot both succeed. See [ADR 005](docs/architecture/005-vehicle-booking-lock.md).
 - **A reservation is not a rental.** It holds dates and a price quote without changing the vehicle's status; pickup converts it into a rental in one transaction, at the quoted price.
 - **No EF Core types leak into the Application layer.**
 
-See [ADR 001](docs/architecture/001-postgresql-persistence.md), [ADR 002](docs/architecture/002-docker-development-environment.md), [ADR 003](docs/architecture/003-authentication-and-authorization.md) and [ADR 004](docs/architecture/004-reservations.md).
+See [ADR 001](docs/architecture/001-postgresql-persistence.md), [ADR 002](docs/architecture/002-docker-development-environment.md), [ADR 003](docs/architecture/003-authentication-and-authorization.md), [ADR 004](docs/architecture/004-reservations.md) and [ADR 005](docs/architecture/005-vehicle-booking-lock.md).
 
 ## Quick start (Docker)
 
@@ -182,11 +183,11 @@ Not implemented yet: refresh tokens, multi-factor authentication, email verifica
 
 | Project | Tests | Covers |
 |---|---:|---|
-| Domain | 130 | Entity invariants, rental and reservation dates and lifecycles, pricing strategies and policy |
-| Application | 150 | Use-case services (including availability, booking, cancellation and pickup) against in-memory fakes and a controlled clock |
-| Infrastructure integration | 136 | EF mapping, migrations, constraints, the no-overlap exclusion constraint, concurrent booking and pickup races, Identity, on real PostgreSQL |
-| API | 318 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, the reservation flow, on real PostgreSQL |
-| **Total** | **734** | **734 passed, 0 failed, 0 skipped** when PostgreSQL is available |
+| Domain | 133 | Entity invariants, rental and reservation dates and lifecycles, pricing strategies and policy |
+| Application | 154 | Use-case services (including availability, booking, cancellation and pickup) against in-memory fakes and a controlled clock |
+| Infrastructure integration | 142 | EF mapping, migrations, constraints, the no-overlap exclusion constraint, concurrent booking and pickup races, Identity, on real PostgreSQL |
+| API | 319 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, the reservation flow, on real PostgreSQL |
+| **Total** | **748** | **748 passed, 0 failed, 0 skipped** when PostgreSQL is available |
 
 Without a configured database, the PostgreSQL-backed tests are skipped and the rest still run; CI fails if any test is skipped. To run them all, point `VEHICLERENTAL_TEST_CONNECTION` at a PostgreSQL server (see [docs/development.md](docs/development.md#database-integration-tests)). The tests create and drop their own databases.
 

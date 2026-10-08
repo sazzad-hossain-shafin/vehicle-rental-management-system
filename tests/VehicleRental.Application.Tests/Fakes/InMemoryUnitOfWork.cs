@@ -8,6 +8,13 @@ namespace VehicleRental.Application.Tests.Fakes;
 /// </summary>
 internal sealed class InMemoryUnitOfWork : IUnitOfWork
 {
+    public Task LockVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.CompletedTask;   // nothing runs concurrently against the in-memory fakes
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

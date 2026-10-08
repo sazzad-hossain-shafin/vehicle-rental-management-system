@@ -52,3 +52,4 @@ Quality checks and Build and test run in parallel; the Docker job starts after B
 - [ADR 002: Docker development environment](002-docker-development-environment.md)
 - [ADR 003: Authentication, authorization and customer ownership](003-authentication-and-authorization.md)
 - [ADR 004: Reservations, date availability and pickup](004-reservations.md)
+- [ADR 005: Serialising bookings of one vehicle with a row lock](005-vehicle-booking-lock.md)

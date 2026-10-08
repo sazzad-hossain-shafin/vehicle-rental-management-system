@@ -486,4 +486,76 @@ public class ReservationServiceTests
         PickupResultDto result = await _app.Reservations.PickUpAsync(reservation.Id);
         Assert.Equal(ReservationStatus.Fulfilled, result.Reservation.Status);
     }
+
+    // ----- Expired reservations (no-shows) and day boundaries -----
+
+    [Fact]
+    public async Task ANoShow_IsFlaggedExpired_FromTheEndDate_AndNotBefore()
+    {
+        var (vehicle, alice, _) = await SetUpAsync();
+        ReservationDto reservation = await ReserveAsync(alice.Id, vehicle.Id, 1, 3);   // holds Oct 2 and Oct 3, ends Oct 4
+
+        _app.Clock.AdvanceDays(2);   // Oct 3: the last day it holds the vehicle
+        Assert.False((await _app.Reservations.GetAsync(reservation.Id)).IsExpired);
+
+        _app.Clock.AdvanceDays(1);   // Oct 4: the end date
+        ReservationDto expired = await _app.Reservations.GetAsync(reservation.Id);
+        Assert.True(expired.IsExpired);
+        Assert.Equal(ReservationStatus.Active, expired.Status);                       // nothing changes it automatically
+        Assert.True((await _app.Reservations.GetPageAsync()).Items.Single().IsExpired);
+        Assert.True((await _app.Reservations.GetPageForCustomerAsync(alice.Id)).Items.Single().IsExpired);
+    }
+
+    [Fact]
+    public async Task TheExpiryFlag_FollowsTheCalendarDay_NotAnElapsedTime()
+    {
+        var (vehicle, alice, _) = await SetUpAsync();
+        ReservationDto reservation = await ReserveAsync(alice.Id, vehicle.Id, 0, 2);   // ends Oct 3
+
+        _app.Clock.AdvanceDays(1);                                                     // Oct 2, 12:00
+        _app.Clock.Advance(TimeSpan.FromHours(11) + TimeSpan.FromMinutes(59));         // Oct 2, 23:59
+        Assert.False((await _app.Reservations.GetAsync(reservation.Id)).IsExpired);
+
+        _app.Clock.Advance(TimeSpan.FromMinutes(1));                                   // Oct 3, 00:00
+        Assert.True((await _app.Reservations.GetAsync(reservation.Id)).IsExpired);
+    }
+
+    [Fact]
+    public async Task AnExpiredReservation_NeverBlocksNewBookingsOrWalkInRentals_ButCannotBePickedUp()
+    {
+        var (vehicle, alice, bob) = await SetUpAsync();
+        ReservationDto noShow = await ReserveAsync(alice.Id, vehicle.Id, 0, 2);        // Oct 1 to Oct 3, never collected
+        _app.Clock.AdvanceDays(2);                                                     // Oct 3: expired
+
+        // The vehicle is free for the new period, in the availability search, for a booking and for a walk-in.
+        Assert.Single((await _app.Reservations.GetAvailableVehiclesPageAsync(Today.AddDays(2), Today.AddDays(4))).Items);
+        await ReserveAsync(bob.Id, vehicle.Id, 2, 4);
+        await _app.Reservations.CancelAsync((await _app.Reservations.GetPageForCustomerAsync(bob.Id)).Items.Single().Id);
+        await _app.Rentals.StartRentalAsync(new StartRentalByIdRequest(vehicle.Id, bob.Id, 1));
+
+        // But the no-show itself can no longer be picked up, and staff can clear it.
+        await Assert.ThrowsAsync<ConflictException>(() => _app.Reservations.PickUpAsync(noShow.Id));
+        await Assert.ThrowsAsync<ConflictException>(() => _app.Reservations.CancelForCustomerAsync(noShow.Id, alice.Id));
+        ReservationDto cancelled = await _app.Reservations.CancelAsync(noShow.Id);
+        Assert.Equal(ReservationStatus.Cancelled, cancelled.Status);
+        Assert.False(cancelled.IsExpired);
+    }
+
+    [Fact]
+    public async Task OnTheLastDayOfAReservation_PickupIsStillPossible_AndTheNextDayItIsNot()
+    {
+        var (vehicle, alice, _) = await SetUpAsync();
+        var other = await _app.AddVehicleAsync("V2");
+        ReservationDto a = await ReserveAsync(alice.Id, vehicle.Id, 0, 3);             // Oct 1 to Oct 4
+        ReservationDto b = await ReserveAsync(alice.Id, other.Id, 0, 3);
+
+        _app.Clock.AdvanceDays(2);                                                     // Oct 3: the last day it holds the vehicle
+        PickupResultDto lastDay = await _app.Reservations.PickUpAsync(a.Id);
+        Assert.Equal(Today.AddDays(2), lastDay.Rental.StartDate);
+        Assert.Equal(Today.AddDays(3), lastDay.Rental.ExpectedReturnDate);
+
+        _app.Clock.AdvanceDays(1);                                                     // Oct 4: the end date
+        await Assert.ThrowsAsync<ConflictException>(() => _app.Reservations.PickUpAsync(b.Id));
+    }
 }
+

@@ -85,10 +85,10 @@ POST /api/v1/me/reservations
 ```json
 { "id": "...", "status": "Active", "startDate": "2026-11-10", "endDate": "2026-11-13",
   "billableDays": 3, "dailyRateAtReservation": 60.00, "pricingDescription": "Normal pricing",
-  "totalCost": 180.00, "rentalId": null, "...": "..." }
+  "totalCost": 180.00, "rentalId": null, "isExpired": false, "...": "..." }
 ```
 
-The customer is never sent: it comes from the signed token. Overlapping an active reservation or rental, cancelling something that is not active, and picking up twice are 409s; invalid or past dates are 400s.
+The customer is never sent: it comes from the signed token. Overlapping an active reservation or rental, cancelling something that is not active, and picking up twice are 409s (as is losing a race to another booking of the same vehicle, which can simply be retried); invalid or past dates are 400s.
 
 ### Accounts and sign-in
 

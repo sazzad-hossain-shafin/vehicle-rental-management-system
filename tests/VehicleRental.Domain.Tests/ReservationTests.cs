@@ -353,4 +353,43 @@ public class ReservationTests
         Assert.Throws<InvalidOperationException>(() => reservation.PickUp(Today, Now));
         Assert.Equal(ReservationStatus.Cancelled, reservation.Status);
     }
+
+    // ----- Expiry (a no-show: still active after its period is over) -----
+
+    [Fact]
+    public void IsExpired_BecomesTrueOnTheEndDate_NotTheDayBefore()
+    {
+        Reservation reservation = Reserve(Today.AddDays(2), Today.AddDays(5));
+
+        Assert.False(reservation.IsExpired(Today));
+        Assert.False(reservation.IsExpired(Today.AddDays(2)));   // the start day
+        Assert.False(reservation.IsExpired(Today.AddDays(4)));   // the last day it holds the vehicle
+        Assert.True(reservation.IsExpired(Today.AddDays(5)));    // the end date: the vehicle is free again
+        Assert.True(reservation.IsExpired(Today.AddDays(30)));
+    }
+
+    [Fact]
+    public void IsExpired_IsFalseOnceCancelledOrFulfilled()
+    {
+        Reservation cancelled = Reserve(Today, Today.AddDays(2));
+        cancelled.Cancel(Now);
+        Reservation fulfilled = Reserve(Today, Today.AddDays(2));
+        fulfilled.PickUp(Today, Now);
+
+        Assert.False(cancelled.IsExpired(Today.AddDays(10)));
+        Assert.False(fulfilled.IsExpired(Today.AddDays(10)));
+    }
+
+    [Fact]
+    public void AnExpiredReservation_CannotBePickedUp_ButCanStillBeCancelledByTheBusiness()
+    {
+        Reservation reservation = Reserve(Today, Today.AddDays(2));
+        DateOnly later = Today.AddDays(2);
+
+        Assert.True(reservation.IsExpired(later));
+        Assert.Throws<InvalidOperationException>(() => reservation.PickUp(later, Now));
+        Assert.True(reservation.CanBeCancelled);
+        Assert.False(reservation.CanBeCancelledByCustomer(later));
+    }
 }
+

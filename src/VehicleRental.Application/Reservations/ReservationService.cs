@@ -93,6 +93,10 @@ public sealed class ReservationService
         Customer customer = await _customers.GetByIdAsync(request.CustomerId, cancellationToken)
                             ?? throw new NotFoundException($"Customer '{request.CustomerId}' was not found.");
 
+        // Serialise with every other booking of this vehicle, then check: the check must see the result of any
+        // rental or reservation that was being created at the same moment.
+        await _unitOfWork.LockVehicleAsync(vehicle.Id, cancellationToken);
+
         if (!await _availability.IsAvailableAsync(
                 vehicle.Id, request.StartDate, request.EndDate, today, cancellationToken))
         {
@@ -111,13 +115,13 @@ public sealed class ReservationService
         await _reservations.AddAsync(reservation, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return reservation.ToDto();
+        return reservation.ToDto(Today());
     }
 
     /// <exception cref="NotFoundException">The reservation does not exist.</exception>
     public async Task<ReservationDto> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
         (await _reservations.GetByIdAsync(id, cancellationToken)
-         ?? throw NotFound(id)).ToDto();
+         ?? throw NotFound(id)).ToDto(Today());
 
     /// <summary>
     /// A reservation, but only if it belongs to the given customer. Someone else's reservation is reported
@@ -128,7 +132,7 @@ public sealed class ReservationService
         Guid id,
         Guid customerId,
         CancellationToken cancellationToken = default) =>
-        (await GetOwnedAsync(id, customerId, cancellationToken)).ToDto();
+        (await GetOwnedAsync(id, customerId, cancellationToken)).ToDto(Today());
 
     /// <summary>One page of all reservations (optionally one status), earliest start date first.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The page or page size is out of range.</exception>
@@ -228,7 +232,7 @@ public sealed class ReservationService
         await _rentals.AddAsync(rental, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return new PickupResultDto(reservation.ToDto(), rental.ToDto());
+        return new PickupResultDto(reservation.ToDto(Today()), rental.ToDto());
     }
 
     private async Task<ReservationDto> CancelAsync(Reservation reservation, CancellationToken cancellationToken)
@@ -244,7 +248,7 @@ public sealed class ReservationService
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return reservation.ToDto();
+        return reservation.ToDto(Today());
     }
 
     private async Task<Reservation> GetOwnedAsync(Guid id, Guid customerId, CancellationToken cancellationToken)
@@ -261,8 +265,12 @@ public sealed class ReservationService
 
     private static NotFoundException NotFound(Guid id) => new($"Reservation '{id}' was not found.");
 
-    private static PagedResult<ReservationDto> ToPage(PageResult<Reservation> result, int page, int pageSize) =>
-        new(result.Items.Select(r => r.ToDto()).ToList(), page, pageSize, result.TotalCount);
+    private PagedResult<ReservationDto> ToPage(PageResult<Reservation> result, int page, int pageSize)
+    {
+        DateOnly today = Today();
+
+        return new(result.Items.Select(r => r.ToDto(today)).ToList(), page, pageSize, result.TotalCount);
+    }
 
     private DateOnly Today() =>
         DateOnly.FromDateTime(_timeProvider.GetLocalNow().DateTime);
