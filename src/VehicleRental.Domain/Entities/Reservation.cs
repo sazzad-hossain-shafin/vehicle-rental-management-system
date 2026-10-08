@@ -162,6 +162,13 @@ public class Reservation
 
     public bool OverlapsPeriod(DateOnly start, DateOnly end) => Overlaps(StartDate, EndDate, start, end);
 
+    /// <summary>
+    /// Whether the reservation is still active although its period is over (today is the end date or later), so it
+    /// was never picked up: a no-show. It cannot be picked up any more and holds no future day, because the period
+    /// is half-open; it stays active only until staff cancel it, as nothing changes its status automatically.
+    /// </summary>
+    public bool IsExpired(DateOnly today) => Status == ReservationStatus.Active && today >= EndDate;
+
     /// <summary>Whether the business can still cancel the reservation (it is active).</summary>
     public bool CanBeCancelled => Status == ReservationStatus.Active;
 

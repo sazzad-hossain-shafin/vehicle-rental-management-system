@@ -269,6 +269,10 @@ public sealed class RentalService
         DateOnly startDate = Today();
         DateOnly returnDate = startDate.AddDays(rentalDays);
 
+        // Serialise with every other booking of this vehicle, then check: the check must see the result of any
+        // reservation that was being created at the same moment.
+        await _unitOfWork.LockVehicleAsync(vehicle.Id, cancellationToken);
+
         // Walk-in rentals must not take a vehicle that is reserved for any of these days. (Picking up the
         // reservation itself goes through ReservationService.PickUpAsync, not through here.)
         if (await _reservations.HasActiveOverlapAsync(vehicle.Id, startDate, returnDate, cancellationToken))

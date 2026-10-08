@@ -159,6 +159,7 @@ public class ReservationApiTests : ApiTestBase
         Assert.Equal(300m, reservation.TotalCost);
         Assert.Equal("Normal pricing", reservation.PricingDescription);
         Assert.Null(reservation.RentalId);
+        Assert.False(reservation.IsExpired);
 
         // A reservation does not check the vehicle out.
         var stillThere = await Client.GetAsync($"{V1}/vehicles/{vehicle.Id}");
@@ -654,4 +655,62 @@ public class ReservationApiTests : ApiTestBase
 
         Assert.Equal(HttpStatusCode.Created, rental.StatusCode);
     }
+
+    // ----- Several API instances against one database -----
+
+    [DatabaseFact]
+    public async Task WalkInRentalsAndReservations_HandledByDifferentApiInstances_NeverDoubleBookAVehicle()
+    {
+        // A second, independent API host (its own services, caches and connection pool) on the same database. They
+        // share nothing in memory, so only the database can keep them consistent.
+        await using var second = new ApiFactory(Api.ConnectionString, signingKey: Api.Factory.SigningKey);
+
+        HttpClient OnSecondHost(HttpClient signedIn)
+        {
+            HttpClient client = second.CreateClient();
+            client.DefaultRequestHeaders.Authorization = signedIn.DefaultRequestHeaders.Authorization;
+
+            return client;
+        }
+
+        var staffFirst = Client;
+        var staffSecond = OnSecondHost(await Api.CreateStaffClientAsync());
+        var walkIn = await Client.CreateCustomerAsync("C9", "Walk In");
+        var customers = new[]
+        {
+            await Api.CreateCustomerClientAsync("One"),
+            await Api.CreateCustomerClientAsync("Two"),
+            await Api.CreateCustomerClientAsync("Three")
+        };
+        var onSecond = new[] { OnSecondHost(customers[1].Client) };
+
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            var vehicle = await Client.CreateVehicleAsync($"RACE-{attempt}");
+
+            var requests = new List<Task<HttpResponseMessage>>
+            {
+                // Rentals (today to day 3) and reservations (day 1 to day 4) all overlap each other.
+                Task.Run(() => (attempt % 2 == 0 ? staffFirst : staffSecond).StartRentalRawAsync(vehicle.Id, walkIn.Id, days: 3)),
+                Task.Run(() => ReserveRawAsync(customers[0].Client, vehicle.Id, 1, 4)),
+                Task.Run(() => ReserveRawAsync(onSecond[0], vehicle.Id, 1, 4)),
+                Task.Run(() => ReserveRawAsync(customers[2].Client, vehicle.Id, 1, 4))
+            };
+
+            var responses = await Task.WhenAll(requests);
+
+            Assert.True(
+                responses.Count(r => r.StatusCode == HttpStatusCode.Created) == 1,
+                $"Attempt {attempt}: expected exactly one booking, got {string.Join(", ", responses.Select(r => (int)r.StatusCode))}.");
+            Assert.Equal(3, responses.Count(r => r.StatusCode == HttpStatusCode.Conflict));
+
+            // One claim in the database: either a rental or a reservation for this vehicle, never both.
+            var rentals = await (await Client.GetAsync($"{V1}/rentals")).ReadAsync<PagedResult<RentalDto>>();
+            var reservations = await (await Client.GetAsync($"{V1}/reservations")).ReadAsync<PagedResult<ReservationDto>>();
+            int claims = rentals.Items.Count(r => r.VehicleId == vehicle.Id)
+                         + reservations.Items.Count(r => r.VehicleId == vehicle.Id && r.Status == ReservationStatus.Active);
+            Assert.Equal(1, claims);
+        }
+    }
 }
+
