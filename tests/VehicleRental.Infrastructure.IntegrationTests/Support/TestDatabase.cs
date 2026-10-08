@@ -36,3 +36,15 @@ public sealed class DatabaseFactAttribute : FactAttribute
         }
     }
 }
+
+/// <summary>The parameterised form of <see cref="DatabaseFactAttribute"/>: skipped, with the reason, without a database.</summary>
+public sealed class DatabaseTheoryAttribute : TheoryAttribute
+{
+    public DatabaseTheoryAttribute()
+    {
+        if (!TestDatabase.IsConfigured)
+        {
+            Skip = $"Needs PostgreSQL: set the {TestDatabase.ConnectionStringVariable} environment variable (see the README).";
+        }
+    }
+}

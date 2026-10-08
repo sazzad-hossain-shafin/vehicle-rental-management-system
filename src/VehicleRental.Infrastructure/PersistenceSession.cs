@@ -19,6 +19,8 @@ public sealed class PersistenceSession : IAsyncDisposable
         Vehicles = new VehicleRepository(db);
         Customers = new CustomerRepository(db);
         Rentals = new RentalRepository(db);
+        Reservations = new ReservationRepository(db);
+        Availability = new VehicleAvailabilityQuery(db);
         UnitOfWork = new UnitOfWork(db);
     }
 
@@ -33,6 +35,10 @@ public sealed class PersistenceSession : IAsyncDisposable
     public ICustomerRepository Customers { get; }
 
     public IRentalRepository Rentals { get; }
+
+    public IReservationRepository Reservations { get; }
+
+    public IVehicleAvailabilityQuery Availability { get; }
 
     public IUnitOfWork UnitOfWork { get; }
 

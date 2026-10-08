@@ -25,6 +25,8 @@ public class VehicleRentalDbContext : IdentityDbContext<ApplicationUser, Identit
 
     public DbSet<Rental> Rentals => Set<Rental>();
 
+    public DbSet<Reservation> Reservations => Set<Reservation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

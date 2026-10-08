@@ -18,6 +18,9 @@ public static class Policies
     /// <summary>Run the rental desk: start and return rentals, and read the whole rental history.</summary>
     public const string RentalManage = nameof(RentalManage);
 
+    /// <summary>Run the reservation desk: list, look up, book for a customer, cancel and pick up any reservation.</summary>
+    public const string ReservationManage = nameof(ReservationManage);
+
     /// <summary>Create staff accounts.</summary>
     public const string UserAdministration = nameof(UserAdministration);
 
@@ -39,6 +42,7 @@ internal static class AuthorizationSetup
             .AddPolicy(Policies.FleetManage, p => p.RequireRole(Roles.Staff, Roles.Admin))
             .AddPolicy(Policies.CustomerManage, p => p.RequireRole(Roles.Staff, Roles.Admin))
             .AddPolicy(Policies.RentalManage, p => p.RequireRole(Roles.Staff, Roles.Admin))
+            .AddPolicy(Policies.ReservationManage, p => p.RequireRole(Roles.Staff, Roles.Admin))
             .AddPolicy(Policies.UserAdministration, p => p.RequireRole(Roles.Admin))
             .AddPolicy(Policies.CustomerSelfService, p => p
                 .RequireRole(Roles.Customer)

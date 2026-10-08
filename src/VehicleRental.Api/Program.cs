@@ -100,6 +100,7 @@ v1.MapMeEndpoints();
 v1.MapVehicleEndpoints();
 v1.MapCustomerEndpoints();
 v1.MapRentalEndpoints();
+v1.MapReservationEndpoints();
 
 app.Run();
 

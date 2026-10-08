@@ -41,7 +41,17 @@ public class AuthorizationMatrixTests : IDisposable
         new("POST", "/api/v1/admin/staff", new { email = "x@example.test", password = "irrelevant" }, [Roles.Admin]),
         new("GET", "/api/v1/me", null, Everyone),
         new("GET", "/api/v1/me/customer", null, [Roles.Customer]),
-        new("GET", "/api/v1/me/rentals", null, [Roles.Customer])
+        new("GET", "/api/v1/me/rentals", null, [Roles.Customer]),
+        new("GET", "/api/v1/vehicles/availability?startDate=2030-01-10&endDate=2030-01-12", null, Everyone),
+        new("POST", "/api/v1/reservations", new { customerId = SomeId, vehicleId = SomeId, startDate = "2030-01-10", endDate = "2030-01-12" }, StaffAndAdmin),
+        new("GET", "/api/v1/reservations", null, StaffAndAdmin),
+        new("GET", $"/api/v1/reservations/{SomeId}", null, StaffAndAdmin),
+        new("POST", $"/api/v1/reservations/{SomeId}/cancel", null, StaffAndAdmin),
+        new("POST", $"/api/v1/reservations/{SomeId}/pickup", null, StaffAndAdmin),
+        new("POST", "/api/v1/me/reservations", new { vehicleId = SomeId, startDate = "2030-01-10", endDate = "2030-01-12" }, [Roles.Customer]),
+        new("GET", "/api/v1/me/reservations", null, [Roles.Customer]),
+        new("GET", $"/api/v1/me/reservations/{SomeId}", null, [Roles.Customer]),
+        new("POST", $"/api/v1/me/reservations/{SomeId}/cancel", null, [Roles.Customer])
     ];
 
     public static IEnumerable<object[]> OperationData() => Enumerable.Range(0, ProtectedOperations.Length).Select(i => new object[] { i });
@@ -132,6 +142,7 @@ public class AuthorizationMatrixTests : IDisposable
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/me/customer")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/me/rentals")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/me/reservations")).StatusCode);
     }
 
     [Fact]
@@ -255,6 +266,7 @@ public class AuthorizationMatrixTests : IDisposable
 
     /// <summary>Turns a concrete URL from the table into its route template.</summary>
     private static string RouteTemplate(string url) => url
+        .Split('?')[0]
         .Replace(SomeId.ToString(), "{id}")
         .Replace("/by-number/C1", "/by-number/{customerNumber}");
 }

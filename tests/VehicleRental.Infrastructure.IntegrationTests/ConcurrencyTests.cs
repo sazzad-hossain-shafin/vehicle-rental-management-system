@@ -83,7 +83,7 @@ public class ConcurrencyTests : DatabaseTestBase
                 {
                     await using var session = Database.CreateSession();
                     var service = new RentalService(
-                        session.Vehicles, session.Customers, session.Rentals, session.UnitOfWork);
+                        session.Vehicles, session.Customers, session.Rentals, session.Reservations, session.UnitOfWork);
                     await service.StartRentalAsync(new StartRentalRequest("ABC-123", customerNumber, name, 3));
 
                     return null;
@@ -156,7 +156,7 @@ public class ConcurrencyTests : DatabaseTestBase
         async Task Rent(string registration, string customerNumber)
         {
             await using var session = Database.CreateSession();
-            var service = new RentalService(session.Vehicles, session.Customers, session.Rentals, session.UnitOfWork);
+            var service = new RentalService(session.Vehicles, session.Customers, session.Rentals, session.Reservations, session.UnitOfWork);
             await service.StartRentalAsync(new StartRentalRequest(registration, customerNumber, "Person " + customerNumber, 2));
         }
 

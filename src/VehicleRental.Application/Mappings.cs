@@ -1,5 +1,6 @@
 using VehicleRental.Application.Customers;
 using VehicleRental.Application.Rentals;
+using VehicleRental.Application.Reservations;
 using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Entities;
 
@@ -24,6 +25,28 @@ internal static class Mappings
 
     public static CustomerDto ToDto(this Customer customer) =>
         new(customer.Id, customer.CustomerNumber, customer.Name);
+
+    public static ReservationDto ToDto(this Reservation reservation) =>
+        new(
+            reservation.Id,
+            reservation.Customer.Id,
+            reservation.Customer.CustomerNumber,
+            reservation.Customer.Name,
+            reservation.Vehicle.Id,
+            reservation.Vehicle.RegistrationNumber,
+            reservation.Vehicle.DisplayName,
+            reservation.Vehicle.VehicleType,
+            reservation.StartDate,
+            reservation.EndDate,
+            reservation.Status,
+            reservation.CreatedAt,
+            reservation.CancelledAt,
+            reservation.FulfilledAt,
+            reservation.RentalId,
+            reservation.DailyRateAtReservation,
+            reservation.BillableDays,
+            reservation.PricingDescription,
+            reservation.TotalCost);
 
     public static RentalDto ToDto(this Rental rental) =>
         new(

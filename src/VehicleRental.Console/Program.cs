@@ -122,7 +122,7 @@ public class Program
     private static Services CreateServices(PersistenceSession session) =>
         new(
             new VehicleService(session.Vehicles, session.UnitOfWork),
-            new RentalService(session.Vehicles, session.Customers, session.Rentals, session.UnitOfWork));
+            new RentalService(session.Vehicles, session.Customers, session.Rentals, session.Reservations, session.UnitOfWork));
 
     // ----- Configuration and startup -----
 

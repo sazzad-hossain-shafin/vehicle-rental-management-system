@@ -47,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<IRentalRepository, RentalRepository>();
+        services.AddScoped<IReservationRepository, ReservationRepository>();
+        services.AddScoped<IVehicleAvailabilityQuery, VehicleAvailabilityQuery>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<DatabaseStatusChecker>();
 

@@ -24,7 +24,7 @@ public class RentalWorkflowTests : DatabaseTestBase
 
         return await action(
             new VehicleService(session.Vehicles, session.UnitOfWork),
-            new RentalService(session.Vehicles, session.Customers, session.Rentals, session.UnitOfWork),
+            new RentalService(session.Vehicles, session.Customers, session.Rentals, session.Reservations, session.UnitOfWork),
             new CustomerService(session.Customers, session.UnitOfWork));
     }
 

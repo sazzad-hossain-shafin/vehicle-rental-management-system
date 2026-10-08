@@ -44,7 +44,17 @@ public class OpenApiAndHealthTests
             ("/api/v1/admin/staff", "post"),
             ("/api/v1/me", "get"),
             ("/api/v1/me/customer", "get"),
-            ("/api/v1/me/rentals", "get")
+            ("/api/v1/me/rentals", "get"),
+            ("/api/v1/vehicles/availability", "get"),
+            ("/api/v1/reservations", "post"),
+            ("/api/v1/reservations", "get"),
+            ("/api/v1/reservations/{id}", "get"),
+            ("/api/v1/reservations/{id}/cancel", "post"),
+            ("/api/v1/reservations/{id}/pickup", "post"),
+            ("/api/v1/me/reservations", "post"),
+            ("/api/v1/me/reservations", "get"),
+            ("/api/v1/me/reservations/{id}", "get"),
+            ("/api/v1/me/reservations/{id}/cancel", "post")
         };
 
         foreach (var (path, method) in expected)

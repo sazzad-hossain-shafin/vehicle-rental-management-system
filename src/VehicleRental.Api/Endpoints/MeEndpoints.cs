@@ -5,6 +5,8 @@ using VehicleRental.Application;
 using VehicleRental.Application.Accounts;
 using VehicleRental.Application.Customers;
 using VehicleRental.Application.Rentals;
+using VehicleRental.Application.Reservations;
+using VehicleRental.Api.Http;
 
 namespace VehicleRental.Api.Endpoints;
 
@@ -41,6 +43,45 @@ internal static class MeEndpoints
             .Produces<PagedResult<RentalDto>>()
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
+        me.MapPost("/reservations", CreateMyReservationAsync)
+            .WithName("CreateMyReservation")
+            .WithSummary("Reserves a vehicle for the signed-in customer")
+            .WithDescription(
+                "The customer is always the signed-in one; the request has no customer field. The period is the " +
+                "half-open interval [startDate, endDate). The price is quoted now and stored.")
+            .RequireAuthorization(Policies.CustomerSelfService)
+            .WithRequestValidation<CreateMyReservationRequest>()
+            .Produces<ReservationDto>(StatusCodes.Status201Created)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        me.MapGet("/reservations", GetMyReservationsAsync)
+            .WithName("ListMyReservations")
+            .WithSummary("Lists the signed-in customer reservations, one page at a time")
+            .RequireAuthorization(Policies.CustomerSelfService)
+            .Produces<PagedResult<ReservationDto>>()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        me.MapGet("/reservations/{id}", GetMyReservationAsync)
+            .WithName("GetMyReservationById")
+            .WithSummary("Gets one of the signed-in customer own reservations")
+            .WithDescription("Someone else reservation is answered 404, exactly like one that does not exist.")
+            .RequireAuthorization(Policies.CustomerSelfService)
+            .Produces<ReservationDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        me.MapPost("/reservations/{id}/cancel", CancelMyReservationAsync)
+            .WithName("CancelMyReservation")
+            .WithSummary("Cancels one of the signed-in customer own reservations")
+            .WithDescription("Only an active reservation that has not started yet. After its start date the rental desk handles it.")
+            .RequireAuthorization(Policies.CustomerSelfService)
+            .Produces<ReservationDto>()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         return routes;
     }
 
@@ -69,4 +110,44 @@ internal static class MeEndpoints
         CancellationToken cancellationToken) =>
         Results.Ok(await rentals.GetCustomerRentalHistoryPageAsync(
             principal.GetCustomerId()!.Value, query.Page, query.PageSize, cancellationToken));
+
+    private static async Task<IResult> CreateMyReservationAsync(
+        CreateMyReservationRequest request,
+        ClaimsPrincipal principal,
+        ReservationService reservations,
+        CancellationToken cancellationToken)
+    {
+        // The customer comes only from the verified token. No promotion: a customer cannot grant themselves a discount.
+        ReservationDto reservation = await reservations.CreateAsync(
+            new CreateReservationRequest(
+                principal.GetCustomerId()!.Value,
+                request.VehicleId!.Value,
+                request.StartDate!.Value,
+                request.EndDate!.Value),
+            cancellationToken);
+
+        return Results.CreatedAtRoute("GetMyReservationById", new { id = reservation.Id }, reservation);
+    }
+
+    private static async Task<IResult> GetMyReservationsAsync(
+        [AsParameters] PageQuery query,
+        ClaimsPrincipal principal,
+        ReservationService reservations,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await reservations.GetPageForCustomerAsync(
+            principal.GetCustomerId()!.Value, query.Page, query.PageSize, cancellationToken));
+
+    private static async Task<IResult> GetMyReservationAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ReservationService reservations,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await reservations.GetForCustomerAsync(id, principal.GetCustomerId()!.Value, cancellationToken));
+
+    private static async Task<IResult> CancelMyReservationAsync(
+        Guid id,
+        ClaimsPrincipal principal,
+        ReservationService reservations,
+        CancellationToken cancellationToken) =>
+        Results.Ok(await reservations.CancelForCustomerAsync(id, principal.GetCustomerId()!.Value, cancellationToken));
 }
