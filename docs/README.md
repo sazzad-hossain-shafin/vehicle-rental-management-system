@@ -18,6 +18,7 @@ Start with the [project README](../README.md) for an overview and the Docker qui
   - [ADR 002: Docker development environment](architecture/002-docker-development-environment.md)
   - [ADR 003: Authentication, authorization and ownership](architecture/003-authentication-and-authorization.md)
   - [ADR 004: Reservations, availability and pickup](architecture/004-reservations.md)
+  - [ADR 005: Serialising bookings of one vehicle with a row lock](architecture/005-vehicle-booking-lock.md)
 
 ## Quality and delivery
 

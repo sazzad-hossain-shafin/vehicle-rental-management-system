@@ -57,17 +57,22 @@ A vehicle is **free for a period** when it has no active reservation overlapping
 - `POST /api/v1/reservations/{id}/cancel`.
 - `POST /api/v1/reservations/{id}/pickup` hands the vehicle over. In one database transaction it creates the rental (starting today, ending on the reservation's end date, at the reserved quote), marks the vehicle rented and marks the reservation fulfilled. If any part fails, nothing is saved. A pickup is refused (409) if the reservation is not active, today is outside its pickup window, or the vehicle has not been returned yet. Picking up later than the start date does not reprice or discount the booking.
 
+## Expired reservations (no-shows)
+
+A reservation that was never picked up stays `Active` after its period ends; nothing changes its status in the background. It is reported with `isExpired: true` from the end date on (the same calendar day the vehicle becomes free), so staff can find and cancel it. An expired reservation cannot be picked up, cannot be cancelled by the customer (it has started), never blocks availability, and does not conflict with a booking or rental that starts on its end date. Its last pickup day is the day before the end date.
+
 ## Concurrency guarantees
 
 - **No double booking.** The application checks availability to give a useful message, but the database decides: a PostgreSQL **exclusion constraint** (`EX_Reservations_NoOverlappingActive`) forbids two **active** reservations of one vehicle with overlapping ranges: `EXCLUDE USING gist ("VehicleId" WITH =, daterange("StartDate","EndDate",'[)') WITH &&) WHERE ("Status" = 'Active')`. Two simultaneous requests cannot both succeed; the loser gets a 409. Cancelled and fulfilled reservations no longer hold the vehicle.
 - **One pickup.** A reservation's row version (`xmin`) and a unique index on the rental it created let exactly one concurrent pickup succeed; the others get a 409.
+- **Rentals and reservations cannot race each other either.** They live in different tables, so a constraint cannot see both. Instead, every operation that creates a claim on a vehicle (a reservation or a walk-in rental) first takes a database row lock on that vehicle inside its transaction and only then checks availability. Bookings of one vehicle therefore run one after another, even across several API instances, and the second one sees the first one's result and gets a 409. The wait is bounded (5 seconds, then a 409 asking to try again), and bookings of different vehicles never wait for each other. See [ADR 005](architecture/005-vehicle-booking-lock.md).
 - **Lost races are conflicts.** When several requests compete, PostgreSQL may abort a loser to break a deadlock; the API reports that as 409 ("changed by another request, try again") rather than as a server error. No database detail reaches the client.
 
 The constraint needs the `btree_gist` extension (it lets a UUID be compared with `=` inside a GiST index). The migration runs `CREATE EXTENSION IF NOT EXISTS btree_gist`. The extension ships with PostgreSQL and is marked trusted, so the database owner can create it. It was verified on PostgreSQL 17.
 
 ## Limits and what is not guaranteed
 
-- A **walk-in rental and a reservation** are in different tables, so the database cannot enforce their non-overlap with one constraint. The application checks both ways, but a walk-in rental and a new reservation submitted at the very same instant could in theory both pass their checks. The pickup path is protected separately (see above). Staff would see this as two claims on one vehicle.
-- No-shows are not expired automatically: an active reservation whose end date has passed stays active until staff cancel it. It can no longer be picked up.
+- The rental-versus-reservation guarantee comes from the vehicle lock that the application takes, not from a single constraint (they are in different tables). It holds for everything that goes through the application. Reservation-versus-reservation overlap is also enforced by the exclusion constraint for SQL that bypasses the application; direct SQL that inserts a rental overlapping a reservation is not stopped.
+- No-shows are not cancelled automatically. An active reservation whose end date has been reached (`isExpired: true` in the response) can no longer be picked up and holds no future day, because the period is half-open, so it never blocks a new booking or a walk-in rental. It simply stays in the list as `Active` until staff cancel it.
 - No payments, deposits, notifications or cancellation fees.
 - Reservation times of day and time zones are not modelled; everything is whole days in the server's local date.

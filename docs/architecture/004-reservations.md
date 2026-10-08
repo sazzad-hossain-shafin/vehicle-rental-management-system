@@ -28,8 +28,8 @@ Customers could sign in and read their own data, but only staff could start a re
 
 ## Consequences
 
-- A walk-in rental and a reservation live in different tables, so their mutual exclusion is checked by the application, not by one constraint. A simultaneous walk-in and reservation could in rare cases both pass their checks. Pickup, reservation-vs-reservation and rental-vs-rental races are all closed by the database.
-- Active reservations whose end date has passed are not expired automatically.
+- A walk-in rental and a reservation live in different tables, so no single constraint covers both. When this ADR was written that left a race between a simultaneous walk-in and reservation; a regression test reproduced it, and [ADR 005](005-vehicle-booking-lock.md) closes it with a per-vehicle row lock.
+- Active reservations whose end date has passed are not cancelled automatically; they are flagged `isExpired` and never block anything.
 - The migration adds the `btree_gist` extension to the database and leaves it installed when rolled back.
 - Everything is whole days in the server's local date; times of day and time zones are not modelled.
 
