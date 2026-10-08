@@ -11,7 +11,8 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 - **Layered architecture** with strictly inward dependencies: Domain, Application, Infrastructure and an HTTP API. The Domain has no framework dependencies, and the Application layer has no EF Core or web dependencies.
 - **PostgreSQL persistence** through EF Core with explicit migrations, unique business keys, protected rental history and a database rule that makes double-renting a vehicle impossible.
 - **Authentication and authorization** with ASP.NET Core Identity, JWT bearer tokens, Admin/Staff/Customer roles, default-deny endpoints and customer ownership checks.
-- **585 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database.
+- **Reservations with a database-enforced no-double-booking guarantee**: customers reserve a vehicle for a date range, and a PostgreSQL exclusion constraint makes overlapping bookings impossible even for simultaneous requests.
+- **734 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database, and concurrency tests for double booking and double pickup.
 - **One-command local environment** with Docker Compose: PostgreSQL, a one-shot migration job and the API.
 - **CI workflow** for build, tests, vulnerability policy and Docker verification. It runs on GitHub Actions on every push and pull request (see [Continuous integration](#continuous-integration)).
 
@@ -31,8 +32,9 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 - **Vehicles:** add, look up (by id or registration number), list with paging and filters (type, maximum daily rate, availability). Browsing is public.
 - **Customers:** register and look up customers; customers can also create their own account.
 - **Rentals:** start a rental, return it, view the history. A vehicle can have only one active rental.
+- **Reservations:** customers check which vehicles are free for a date range, reserve one for themselves, view and cancel their own bookings. Staff can book at the desk and pick a reservation up, which starts the rental at the quoted price. Details: [docs/reservations.md](docs/reservations.md).
 - **Pricing:** strategy-based (normal, 10% promotional discount, 20% long-term discount for 7+ days). The price is calculated when the rental starts and stored on the rental, so history never changes when rates change.
-- **Accounts:** sign in, register as a customer, admin-created staff accounts, and `/me` endpoints for a customer's own profile and rentals.
+- **Accounts:** sign in, register as a customer, admin-created staff accounts, and `/me` endpoints for a customer's own profile, rentals and reservations.
 - **Operations:** paged lists, consistent Problem Details errors, readiness and liveness health endpoints, OpenAPI documentation.
 - **Console client:** a small text-menu client kept as a secondary demo.
 
@@ -62,7 +64,7 @@ Arrows point from a project to the projects it depends on. The Domain depends on
 
 | Project | Responsibility |
 |---|---|
-| `VehicleRental.Domain` | Entities, enums, validation and pricing rules. |
+| `VehicleRental.Domain` | Entities (vehicle, customer, rental, reservation), enums, validation, lifecycles and pricing rules. |
 | `VehicleRental.Application` | Use-case services, DTOs, repository and unit-of-work abstractions, paging. |
 | `VehicleRental.Infrastructure` | EF Core mapping and migrations, repositories, Identity accounts, token issuing, database health check. |
 | `VehicleRental.Api` | HTTP endpoints, authentication and authorization policies, error handling, OpenAPI, health checks. |
@@ -91,9 +93,11 @@ More detail, including the operational view, is in [docs/architecture/overview.m
 - **Identity is separate from the domain `Customer`.** A nullable link column joins a login to a customer record, and the domain knows nothing about Identity.
 - **The customer comes from the signed token**, never from an ID in the request. Another customer's rental answers 404, exactly like one that does not exist.
 - **Double rental is prevented by the database**: optimistic concurrency on the PostgreSQL row version plus a partial unique index allowing one active rental per vehicle.
+- **Double booking is prevented by the database too**: a PostgreSQL exclusion constraint on the vehicle and the half-open date range `[start, end)` refuses overlapping active reservations. The application checks first for a friendly message, but the constraint has the final say.
+- **A reservation is not a rental.** It holds dates and a price quote without changing the vehicle's status; pickup converts it into a rental in one transaction, at the quoted price.
 - **No EF Core types leak into the Application layer.**
 
-See [ADR 001](docs/architecture/001-postgresql-persistence.md), [ADR 002](docs/architecture/002-docker-development-environment.md) and [ADR 003](docs/architecture/003-authentication-and-authorization.md).
+See [ADR 001](docs/architecture/001-postgresql-persistence.md), [ADR 002](docs/architecture/002-docker-development-environment.md), [ADR 003](docs/architecture/003-authentication-and-authorization.md) and [ADR 004](docs/architecture/004-reservations.md).
 
 ## Quick start (Docker)
 
@@ -140,6 +144,10 @@ All routes are under `/api/v1`. The full list, conventions, paging and errors ar
 | GET | `/vehicles` (paged; filters `vehicleType`, `maxDailyRate`, `availability`) | Public |
 | POST | `/auth/login`, `/auth/register` | Public |
 | GET | `/me`, `/me/customer`, `/me/rentals` | Signed in / Customer |
+| GET | `/vehicles/availability?startDate=&endDate=` | Signed in |
+| POST, GET | `/me/reservations`, `/me/reservations/{id}` | Customer (own data only) |
+| POST | `/me/reservations/{id}/cancel` | Customer (own, before the start date) |
+| GET, POST | `/reservations`, `/reservations/{id}/cancel`, `/reservations/{id}/pickup` | Staff, Admin |
 | POST | `/vehicles`, `/customers` | Staff, Admin |
 | POST | `/rentals`, `/rentals/{id}/return` | Staff, Admin |
 | GET | `/rentals`, `/rentals/{id}` | Staff, Admin; customers see only their own |
@@ -163,7 +171,7 @@ Authorization: Bearer <access token>
 - **Accounts:** ASP.NET Core Identity. Password hashing, validation and lockout (5 failed attempts, 15 minutes) are Identity's; nothing is hashed by hand.
 - **Tokens:** JWT bearer, signed with HMAC-SHA256, 30-minute lifetime, validated for signature, issuer, audience and expiry. The API refuses to start without a strong signing key.
 - **Authorization:** Admin, Staff and Customer roles mapped to named policies. Every endpoint requires sign-in unless explicitly marked anonymous, and a test checks every mapped endpoint against the documented access matrix.
-- **Ownership / IDOR protection:** customers can reach only their own data, using the customer ID from the signed token.
+- **Ownership / IDOR protection:** customers can reach only their own data, using the customer ID from the signed token. A customer's reservation request has no customer field at all.
 - **Secrets:** supplied through environment variables or user secrets. `.env` is git-ignored, and `.env.example` holds no values. Compose refuses to start without the required secrets.
 - **Containers:** the API runs as a non-root user with a read-only filesystem, all Linux capabilities dropped and `no-new-privileges`. The API port is bound to `127.0.0.1`.
 - **Health endpoints** return status only, never connection details. Unexpected errors return a generic body with no stack trace.
@@ -174,15 +182,15 @@ Not implemented yet: refresh tokens, multi-factor authentication, email verifica
 
 | Project | Tests | Covers |
 |---|---:|---|
-| Domain | 92 | Entity invariants, rental dates, pricing strategies and policy |
-| Application | 122 | Use-case services against in-memory fakes |
-| Infrastructure integration | 111 | EF mapping, migrations, constraints, concurrency, Identity, on real PostgreSQL |
-| API | 260 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, on real PostgreSQL |
-| **Total** | **585** | **585 passed, 0 failed, 0 skipped** when PostgreSQL is available |
+| Domain | 130 | Entity invariants, rental and reservation dates and lifecycles, pricing strategies and policy |
+| Application | 150 | Use-case services (including availability, booking, cancellation and pickup) against in-memory fakes and a controlled clock |
+| Infrastructure integration | 136 | EF mapping, migrations, constraints, the no-overlap exclusion constraint, concurrent booking and pickup races, Identity, on real PostgreSQL |
+| API | 318 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, the reservation flow, on real PostgreSQL |
+| **Total** | **734** | **734 passed, 0 failed, 0 skipped** when PostgreSQL is available |
 
-Without a configured database, the 182 PostgreSQL-backed tests are skipped and the rest still run. To run them all, point `VEHICLERENTAL_TEST_CONNECTION` at a PostgreSQL server (see [docs/development.md](docs/development.md#database-integration-tests)). The tests create and drop their own databases.
+Without a configured database, the PostgreSQL-backed tests are skipped and the rest still run; CI fails if any test is skipped. To run them all, point `VEHICLERENTAL_TEST_CONNECTION` at a PostgreSQL server (see [docs/development.md](docs/development.md#database-integration-tests)). The tests create and drop their own databases.
 
-The Docker smoke test (`scripts/smoke-test.sh`) runs 21 end-to-end checks against the running Compose stack: health, public access, 401/403, customer isolation and a full rental.
+The Docker smoke test (`scripts/smoke-test.sh`) runs 38 end-to-end checks against the running Compose stack: health, public access, 401/403, customer isolation, a full rental, and the reservation flow (availability, booking, overlap and adjacent dates, cancellation, desk booking and pickup).
 
 ## Continuous integration
 
@@ -211,7 +219,7 @@ Dockerfile, compose.yaml, .env.example     Container build and local environment
 
 Planned, not implemented:
 
-- Booking and reservation workflow, with availability calendar logic
+- Reservation extras: payments or deposits, notifications, cancellation fees, automatic expiry of no-shows, and a staff calendar view
 - Refresh tokens, email verification, password reset and MFA
 - A frontend client
 - Observability (structured logging, metrics, tracing)

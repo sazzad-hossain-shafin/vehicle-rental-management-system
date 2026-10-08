@@ -19,8 +19,8 @@ An arrow means "references". The Domain references nothing. The Application laye
 
 | Layer | Owns | Must not contain |
 |---|---|---|
-| Domain | Entities, validation, rental lifecycle, pricing strategies and policy | Framework, database or HTTP types |
-| Application | Use-case services, DTOs, repository and unit-of-work interfaces, paging, application errors | EF Core, Npgsql, ASP.NET Core |
+| Domain | Entities (vehicle, customer, rental, reservation), validation, lifecycles, pricing strategies and policy | Framework, database or HTTP types |
+| Application | Use-case services (vehicles, customers, rentals, reservations), DTOs, repository, availability-query and unit-of-work interfaces, paging, application errors | EF Core, Npgsql, ASP.NET Core |
 | Infrastructure | EF Core mapping and migrations, repositories, Identity accounts, JWT issuing, database health check | Business rules |
 | Api | Endpoints, request validation, authentication and authorization policies, Problem Details, OpenAPI | Business rules, data access |
 | Console | A text-menu client for the same use cases | Business rules |
@@ -51,3 +51,4 @@ Quality checks and Build and test run in parallel; the Docker job starts after B
 - [ADR 001: PostgreSQL persistence with EF Core](001-postgresql-persistence.md)
 - [ADR 002: Docker development environment](002-docker-development-environment.md)
 - [ADR 003: Authentication, authorization and customer ownership](003-authentication-and-authorization.md)
+- [ADR 004: Reservations, date availability and pickup](004-reservations.md)

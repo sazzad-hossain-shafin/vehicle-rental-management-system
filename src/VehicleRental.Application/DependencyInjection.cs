@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using VehicleRental.Application.Customers;
 using VehicleRental.Application.Rentals;
+using VehicleRental.Application.Reservations;
 using VehicleRental.Application.Vehicles;
 
 namespace VehicleRental.Application;
@@ -18,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<VehicleService>();
         services.AddScoped<CustomerService>();
         services.AddScoped<RentalService>();
+        services.AddScoped<ReservationService>();
 
         return services;
     }

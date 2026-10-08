@@ -16,6 +16,7 @@ public sealed class RentalService
     private readonly IVehicleRepository _vehicles;
     private readonly ICustomerRepository _customers;
     private readonly IRentalRepository _rentals;
+    private readonly IReservationRepository _reservations;
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _timeProvider;
 
@@ -23,12 +24,14 @@ public sealed class RentalService
         IVehicleRepository vehicles,
         ICustomerRepository customers,
         IRentalRepository rentals,
+        IReservationRepository reservations,
         IUnitOfWork unitOfWork,
         TimeProvider? timeProvider = null)
     {
         _vehicles = vehicles;
         _customers = customers;
         _rentals = rentals;
+        _reservations = reservations;
         _unitOfWork = unitOfWork;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -265,6 +268,14 @@ public sealed class RentalService
     {
         DateOnly startDate = Today();
         DateOnly returnDate = startDate.AddDays(rentalDays);
+
+        // Walk-in rentals must not take a vehicle that is reserved for any of these days. (Picking up the
+        // reservation itself goes through ReservationService.PickUpAsync, not through here.)
+        if (await _reservations.HasActiveOverlapAsync(vehicle.Id, startDate, returnDate, cancellationToken))
+        {
+            throw new ConflictException(
+                $"Vehicle '{vehicle.RegistrationNumber}' is reserved for part of that period.");
+        }
 
         int billableDays = Rental.CalculateBillableDays(startDate, returnDate);
         IVehiclePricingStrategy strategy =

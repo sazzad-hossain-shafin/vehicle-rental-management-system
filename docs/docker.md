@@ -86,6 +86,7 @@ The API **never changes the database schema itself**. A separate one-shot servic
   ```
 
 - If a migration fails, `migrate` exits with an error and the API does not start, so you never run against a half-migrated schema.
+- The reservations migration runs `CREATE EXTENSION IF NOT EXISTS btree_gist` (needed for the no-double-booking constraint). The Compose database user is the PostgreSQL superuser, so this works out of the box; the extension is also marked trusted, so a normal database owner can create it.
 - To start only the API and skip the migration step (you accept the schema as it is): `docker compose up -d --no-deps api`.
 
 ## Health checks

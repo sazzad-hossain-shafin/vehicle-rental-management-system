@@ -13,7 +13,7 @@ The steps used to publish this repository to GitHub safely, kept as a reference 
   ```
 - [ ] Confirm every commit author and committer is the GitHub noreply address.
 - [ ] Check the largest tracked files: `git ls-files -z | xargs -0 du -k | sort -rn | head`.
-- [ ] Run the full local verification: build with `-warnaserror`, all 585 tests with PostgreSQL available, and the Docker smoke test.
+- [ ] Run the full local verification: build with `-warnaserror`, all tests with PostgreSQL available, and the Docker smoke test.
 - [ ] If any scan finds something in an old commit, stop. Decide deliberately whether to rewrite history before publishing, because publication cannot be undone.
 
 ## 2. Create the repository
@@ -26,7 +26,7 @@ The steps used to publish this repository to GitHub safely, kept as a reference 
 ## 3. Watch the first CI run
 
 - [ ] Open the Actions tab and watch the first run. The workflow has never run on GitHub-hosted runners, so expect to fix something runner-specific.
-- [ ] Confirm all three jobs pass, the test-results artifact uploads, and the test summary shows 585 passed and 0 skipped.
+- [ ] Confirm all three jobs pass, the test-results artifact uploads, and the test summary shows every test passed and none skipped.
 - [ ] Fix any problems in small commits.
 
 ## 4. Repository settings

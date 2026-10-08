@@ -51,6 +51,7 @@ public class Rental
         Vehicle vehicle,
         DateOnly startDate,
         DateOnly expectedReturnDate,
+        decimal dailyRate,
         int billableDays,
         string pricingDescription,
         decimal totalCost)
@@ -61,7 +62,7 @@ public class Rental
         StartDate = startDate;
         ExpectedReturnDate = expectedReturnDate;
         BillableDays = billableDays;
-        DailyRateAtRental = vehicle.DailyRate;
+        DailyRateAtRental = dailyRate;
         PricingDescription = pricingDescription;
         TotalCost = totalCost;
         Status = RentalStatus.Active;
@@ -114,10 +115,27 @@ public class Rental
             vehicle,
             startDate,
             expectedReturnDate,
+            vehicle.DailyRate,
             billableDays,
             pricingStrategy.Name,
             totalCost);
     }
+
+    /// <summary>
+    /// Starts the rental for a reservation being picked up, from today until the reservation's end date.
+    /// The price is the reservation's stored quote, not a new calculation. The caller
+    /// (<see cref="Reservation.PickUp"/>) has already validated the pickup and marked the vehicle as rented.
+    /// </summary>
+    internal static Rental StartFromReservation(Reservation reservation, DateOnly today) =>
+        new(
+            reservation.Customer,
+            reservation.Vehicle,
+            today,
+            reservation.EndDate,
+            reservation.DailyRateAtReservation,
+            reservation.BillableDays,
+            reservation.PricingDescription,
+            reservation.TotalCost);
 
     /// <summary>
     /// Completes the rental, records the return date and makes the vehicle available again.

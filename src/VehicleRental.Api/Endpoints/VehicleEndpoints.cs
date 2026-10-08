@@ -3,6 +3,7 @@ using VehicleRental.Api.Http;
 using VehicleRental.Api.Security;
 using VehicleRental.Application;
 using VehicleRental.Application.Abstractions;
+using VehicleRental.Application.Reservations;
 using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Enums;
 
@@ -22,6 +23,20 @@ internal static class VehicleEndpoints
             .Produces<PagedResult<VehicleDto>>()
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        // A literal segment always wins over the "{id}" parameter in routing.
+        group.MapGet("/availability", ListAvailableVehiclesAsync)
+            .WithName("ListAvailableVehicles")
+            .RequireAuthorization()
+            .WithSummary("Lists the vehicles that are free for a date range, one page at a time")
+            .WithDescription(
+                "The period is the half-open interval [startDate, endDate): a vehicle booked until the start date " +
+                "is still free, and so is one booked from the end date. A vehicle is free when it has no active " +
+                "reservation and no active rental overlapping the period. Requires a sign-in.")
+            .Produces<PagedResult<VehicleDto>>()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/{id}", GetVehicleAsync)
             .WithName("GetVehicleById")
@@ -77,7 +92,7 @@ internal static class VehicleEndpoints
     /// Reads an optional enum filter by name, ignoring letter case, like enums in JSON bodies. Numbers
     /// (which would parse to meaningless values) and unknown names are reported as validation errors.
     /// </summary>
-    private static TEnum? ParseFilter<TEnum>(string? value, string name, Dictionary<string, string[]> errors)
+    internal static TEnum? ParseFilter<TEnum>(string? value, string name, Dictionary<string, string[]> errors)
         where TEnum : struct, Enum
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -96,6 +111,40 @@ internal static class VehicleEndpoints
         errors[name] = [$"Must be one of: {string.Join(", ", Enum.GetNames<TEnum>())}."];
 
         return null;
+    }
+
+    private static async Task<IResult> ListAvailableVehiclesAsync(
+        [AsParameters] AvailabilityQuery query,
+        ReservationService reservations,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (query.StartDate is null)
+        {
+            errors["startDate"] = ["startDate is required (yyyy-MM-dd)."];
+        }
+
+        if (query.EndDate is null)
+        {
+            errors["endDate"] = ["endDate is required (yyyy-MM-dd)."];
+        }
+
+        VehicleType? type = ParseFilter<VehicleType>(query.VehicleType, "vehicleType", errors);
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        return Results.Ok(await reservations.GetAvailableVehiclesPageAsync(
+            query.StartDate!.Value,
+            query.EndDate!.Value,
+            type,
+            query.MaxDailyRate,
+            query.Page,
+            query.PageSize,
+            cancellationToken));
     }
 
     private static async Task<IResult> GetVehicleAsync(

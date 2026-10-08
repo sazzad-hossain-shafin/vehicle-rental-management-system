@@ -1,6 +1,7 @@
 using VehicleRental.Application.Customers;
 using VehicleRental.Application.Tests.Fakes;
 using VehicleRental.Application.Rentals;
+using VehicleRental.Application.Reservations;
 using VehicleRental.Application.Vehicles;
 using VehicleRental.Domain.Enums;
 
@@ -18,6 +19,8 @@ internal sealed class FixedTimeProvider : TimeProvider
     public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
 
     public void AdvanceDays(int days) => _now = _now.AddDays(days);
+
+    public void Advance(TimeSpan time) => _now = _now.Add(time);
 }
 
 /// <summary>
@@ -32,10 +35,12 @@ internal sealed class TestApp
     public InMemoryVehicleRepository VehicleRepository { get; } = new();
     public InMemoryCustomerRepository CustomerRepository { get; } = new();
     public InMemoryRentalRepository RentalRepository { get; } = new();
+    public InMemoryReservationRepository ReservationRepository { get; } = new();
 
     public VehicleService Vehicles { get; }
     public CustomerService Customers { get; }
     public RentalService Rentals { get; }
+    public ReservationService Reservations { get; }
 
     public TestApp()
     {
@@ -43,7 +48,16 @@ internal sealed class TestApp
 
         Vehicles = new VehicleService(VehicleRepository, unitOfWork);
         Customers = new CustomerService(CustomerRepository, unitOfWork);
-        Rentals = new RentalService(VehicleRepository, CustomerRepository, RentalRepository, unitOfWork, Clock);
+        Rentals = new RentalService(
+            VehicleRepository, CustomerRepository, RentalRepository, ReservationRepository, unitOfWork, Clock);
+        Reservations = new ReservationService(
+            VehicleRepository,
+            CustomerRepository,
+            ReservationRepository,
+            RentalRepository,
+            new InMemoryAvailabilityQuery(VehicleRepository, ReservationRepository, RentalRepository),
+            unitOfWork,
+            Clock);
     }
 
     public Task<VehicleDto> AddVehicleAsync(

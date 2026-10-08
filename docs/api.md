@@ -57,7 +57,38 @@ IDs in URLs are permanent GUIDs. Business identifiers (registration number, cust
 | GET | `/rentals/{id}` | One rental | 200 |
 | POST | `/rentals/{id}/return` | Complete a rental | 200 |
 
+Reservations (booking a vehicle for future dates) are in the next section.
+
 Access: vehicle reads are public; `POST /vehicles`, the customer endpoints and the rental desk endpoints (`POST /rentals`, `GET /rentals`, `POST .../return`) are for Staff and Admin; `GET /rentals/{id}` is for any signed-in account, but customers only get their own.
+
+### Availability and reservations
+
+A reservation holds a vehicle for the half-open date range `[startDate, endDate)` (free again on the end date) and stores a price quote. Dates are `yyyy-MM-dd`. The full behaviour, rules and limits are in [reservations](reservations.md).
+
+| Method | Route | Access | Purpose | Success |
+|--------|-------|--------|---------|---------|
+| GET | `/vehicles/availability?startDate=&endDate=` | Signed in | Vehicles free for the period (paged; `vehicleType`, `maxDailyRate`) | 200 |
+| POST | `/me/reservations` | Customer | Reserve a vehicle for the signed-in customer (body: `vehicleId`, `startDate`, `endDate`) | 201 + `Location` |
+| GET | `/me/reservations` | Customer | My reservations (paged) | 200 |
+| GET | `/me/reservations/{id}` | Customer | One of my reservations (someone else's is a 404) | 200 |
+| POST | `/me/reservations/{id}/cancel` | Customer | Cancel my reservation before its start date | 200 |
+| POST | `/reservations` | Staff, Admin | Book at the desk for a customer (`customerId`, optional `promotionalDiscountRequested`) | 201 + `Location` |
+| GET | `/reservations` | Staff, Admin | All reservations (paged; optional `status`) | 200 |
+| GET | `/reservations/{id}` | Staff, Admin | One reservation | 200 |
+| POST | `/reservations/{id}/cancel` | Staff, Admin | Cancel an active reservation | 200 |
+| POST | `/reservations/{id}/pickup` | Staff, Admin | Hand the vehicle over: starts the rental and fulfils the reservation | 200 |
+
+```http
+POST /api/v1/me/reservations
+{ "vehicleId": "01a110f2-8111-...", "startDate": "2026-11-10", "endDate": "2026-11-13" }
+```
+```json
+{ "id": "...", "status": "Active", "startDate": "2026-11-10", "endDate": "2026-11-13",
+  "billableDays": 3, "dailyRateAtReservation": 60.00, "pricingDescription": "Normal pricing",
+  "totalCost": 180.00, "rentalId": null, "...": "..." }
+```
+
+The customer is never sent: it comes from the signed token. Overlapping an active reservation or rental, cancelling something that is not active, and picking up twice are 409s; invalid or past dates are 400s.
 
 ### Accounts and sign-in
 
@@ -127,7 +158,7 @@ List endpoints take `page` (from 1, default 1) and `pageSize` (1 to 100, default
 { "items": [ ... ], "page": 1, "pageSize": 20, "totalCount": 42, "totalPages": 3 }
 ```
 
-A page past the end is empty, with the correct totals. Out-of-range values are a 400.
+A page past the end is empty, with the correct totals. The reservation lists use the same paging. Out-of-range values are a 400.
 
 ## Errors
 
@@ -146,4 +177,4 @@ The 409 for a lost race is a real guarantee: two simultaneous requests can never
 
 ## Not included yet
 
-Refresh tokens, email verification and password reset, rate limiting, CORS (no browser client exists yet), updating or deleting vehicles and customers, reservations/bookings, payments.
+Refresh tokens, email verification and password reset, rate limiting, CORS (no browser client exists yet), updating or deleting vehicles and customers, payments, deposits and notifications for reservations.
