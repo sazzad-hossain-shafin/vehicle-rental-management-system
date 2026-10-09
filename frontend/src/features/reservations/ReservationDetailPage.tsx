@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -8,7 +8,7 @@ import { ErrorState, LoadingBlock } from '../../components/ui/States'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { ApiError } from '../../lib/api/errors'
 import type { Reservation } from '../../lib/api/types'
-import { formatDate, formatDateTime, todayIso } from '../../lib/dates'
+import { formatDate, formatDateTime, formatWeekday, todayIso } from '../../lib/dates'
 import { formatMoney, pluralize } from '../../lib/format'
 import { useCancelReservation, useMyReservation } from './queries'
 import { ReservationStatusBadge } from './ReservationStatusBadge'
@@ -81,82 +81,112 @@ function ReservationView({ reservation, justBooked }: { reservation: Reservation
   const cancelError = cancel.error
 
   return (
-    <div className="container page stack">
+    <div className="container page">
       <Link className="back-link" to="/reservations">
         <ArrowLeft size={18} aria-hidden="true" /> My reservations
       </Link>
 
-      {justBooked && (
-        <Alert tone="success" title="Reservation confirmed">
-          <p>
-            Your {reservation.vehicleDisplayName} is reserved from {formatDate(reservation.startDate)} to{' '}
-            {formatDate(reservation.endDate)}. Keep your reference below. Staff will hand over the vehicle at the rental desk
-            on your pickup day.
-          </p>
-        </Alert>
-      )}
-      {cancelled && (
-        <Alert tone="success" title="Reservation cancelled">
-          <p>The dates are free again. You can reserve another vehicle at any time.</p>
-        </Alert>
-      )}
-
-      <section className="card card-body" aria-labelledby="reservation-title">
-        <div className="detail-header">
-          <h1 id="reservation-title">{reservation.vehicleDisplayName}</h1>
-          <ReservationStatusBadge reservation={reservation} />
-        </div>
-
-        <dl className="detail-list">
-          <dt>Reference</dt>
-          <dd>{reservation.id}</dd>
-          <dt>Pickup</dt>
-          <dd>{formatDate(reservation.startDate)}</dd>
-          <dt>Return</dt>
-          <dd>{formatDate(reservation.endDate)}</dd>
-          <dt>Days charged</dt>
-          <dd>{pluralize(reservation.billableDays, 'day')}</dd>
-          <dt>Price per day</dt>
-          <dd>{formatMoney(reservation.dailyRateAtReservation)}</dd>
-          <dt>Pricing</dt>
-          <dd>{reservation.pricingDescription}</dd>
-          <dt>Total</dt>
-          <dd>{formatMoney(reservation.totalCost)}</dd>
-          <dt>Reserved on</dt>
-          <dd>{formatDateTime(reservation.createdAt)}</dd>
-          {reservation.cancelledAt && (
-            <>
-              <dt>Cancelled on</dt>
-              <dd>{formatDateTime(reservation.cancelledAt)}</dd>
-            </>
-          )}
-          {reservation.fulfilledAt && (
-            <>
-              <dt>Picked up on</dt>
-              <dd>{formatDateTime(reservation.fulfilledAt)}</dd>
-            </>
-          )}
-        </dl>
-
-        {reservation.isExpired && (
-          <Alert tone="warning" title="This reservation was not collected">
-            <p>Its dates have passed. The rental desk can cancel it for you.</p>
+      <div className="stack">
+        {justBooked && (
+          <Alert tone="success" title="Reservation confirmed">
+            <p>
+              Your {reservation.vehicleDisplayName} is reserved from {formatDate(reservation.startDate)} to{' '}
+              {formatDate(reservation.endDate)}. Keep your reference below. Staff will hand over the vehicle at the rental desk
+              on your pickup day.
+            </p>
           </Alert>
         )}
-        {startedButActive && !reservation.isExpired && (
-          <p className="muted">
-            This reservation has started, so it can only be cancelled by the rental desk.
-          </p>
+        {cancelled && (
+          <Alert tone="success" title="Reservation cancelled">
+            <p>The dates are free again. You can reserve another vehicle at any time.</p>
+          </Alert>
         )}
+      </div>
 
-        {canCancel && (
-          <p>
-            <Button variant="danger" onClick={() => setConfirming(true)}>
-              Cancel this reservation
-            </Button>
-          </p>
-        )}
-      </section>
+      <div className="split reservation-split">
+        <section className="card card-body" aria-labelledby="reservation-title">
+          <div className="detail-header">
+            <h1 id="reservation-title">{reservation.vehicleDisplayName}</h1>
+            <ReservationStatusBadge reservation={reservation} />
+          </div>
+
+          <dl className="date-pair date-pair-large">
+            <div>
+              <dt>Pickup</dt>
+              <dd>
+                <span className="weekday">{formatWeekday(reservation.startDate)}</span> {formatDate(reservation.startDate)}
+              </dd>
+            </div>
+            <ArrowRight size={18} aria-hidden="true" className="date-arrow" />
+            <div>
+              <dt>Return</dt>
+              <dd>
+                <span className="weekday">{formatWeekday(reservation.endDate)}</span> {formatDate(reservation.endDate)}
+              </dd>
+            </div>
+          </dl>
+
+          <h2 className="section-title">Price</h2>
+          <dl className="detail-list price-list">
+            <dt>Price per day</dt>
+            <dd>{formatMoney(reservation.dailyRateAtReservation)}</dd>
+            <dt>Days charged</dt>
+            <dd>{pluralize(reservation.billableDays, 'day')}</dd>
+            <dt>Pricing</dt>
+            <dd>{reservation.pricingDescription}</dd>
+            <dt className="total-label">Total</dt>
+            <dd className="total-value">{formatMoney(reservation.totalCost)}</dd>
+          </dl>
+        </section>
+
+        <aside className="card card-body stack" aria-labelledby="booking-title">
+          <h2 id="booking-title" className="section-title">
+            Booking
+          </h2>
+          <dl className="detail-list">
+            <dt>Reference</dt>
+            <dd className="reference">{reservation.id}</dd>
+            <dt>Reserved on</dt>
+            <dd>{formatDateTime(reservation.createdAt)}</dd>
+            {reservation.cancelledAt && (
+              <>
+                <dt>Cancelled on</dt>
+                <dd>{formatDateTime(reservation.cancelledAt)}</dd>
+              </>
+            )}
+            {reservation.fulfilledAt && (
+              <>
+                <dt>Picked up on</dt>
+                <dd>{formatDateTime(reservation.fulfilledAt)}</dd>
+              </>
+            )}
+          </dl>
+
+          {reservation.isExpired && (
+            <Alert tone="warning" title="This reservation was not collected">
+              <p>Its dates have passed. The rental desk can cancel it for you.</p>
+            </Alert>
+          )}
+          {startedButActive && !reservation.isExpired && (
+            <p className="muted rule-note">
+              <Info size={16} aria-hidden="true" /> This reservation has started, so it can only be cancelled by the rental
+              desk.
+            </p>
+          )}
+          {canCancel && (
+            <div className="cancel-box">
+              <p className="muted rule-note">
+                <Info size={16} aria-hidden="true" /> You can cancel online until the day before pickup. After that, the
+                rental desk cancels for you.
+              </p>
+              <Button variant="danger" block onClick={() => setConfirming(true)}>
+                Cancel this reservation
+              </Button>
+            </div>
+          )}
+          {reservation.status === 'Cancelled' && <p className="muted rule-note">This reservation was cancelled and the dates were released.</p>}
+        </aside>
+      </div>
 
       <Dialog open={confirming} onClose={closeDialog} title="Cancel this reservation?">
         <p>

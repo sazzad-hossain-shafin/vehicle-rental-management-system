@@ -43,8 +43,8 @@ describe('vehicle details and the quote', () => {
     expect(within(table).getByText('3 days')).toBeInTheDocument()
     expect(within(table).getByText('Normal pricing')).toBeInTheDocument()
     expect(within(table).getAllByText('$180.00')).toHaveLength(1)
-    expect(screen.getByText('Thu, 10 Jan 2030', { selector: 'strong' })).toBeInTheDocument()
-    expect(screen.getByText('Sun, 13 Jan 2030', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('10 Jan 2030', { selector: 'strong' })).toBeInTheDocument()
+    expect(screen.getByText('13 Jan 2030', { selector: 'strong' })).toBeInTheDocument()
 
     const quoteCall = api.called('GET', `/api/v1/vehicles/${VEHICLE_ID}/quote`)[0]
     expect(quoteCall?.query.get('startDate')).toBe('2030-01-10')

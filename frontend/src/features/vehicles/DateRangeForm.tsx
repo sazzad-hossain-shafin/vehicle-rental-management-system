@@ -2,7 +2,7 @@ import { CalendarDays, Search } from 'lucide-react'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '../../components/ui/Button'
 import { TextField } from '../../components/ui/Field'
-import { addDays, todayIso, validateRange, type RangeErrors } from '../../lib/dates'
+import { addDays, formatDate, isIsoDate, todayIso, validateRange, type RangeErrors } from '../../lib/dates'
 
 export interface DateRangeValue {
   startDate: string
@@ -18,13 +18,15 @@ interface DateRangeFormProps {
   idPrefix?: string
   /** Wide layout for the home page: dates and button on one row from tablet width up. */
   wide?: boolean
+  /** Show the readable "9 Oct 2026 → 12 Oct 2026" line under the dates (default). */
+  summary?: boolean
 }
 
 /**
  * Pickup and return dates. The customer picks the day they collect the vehicle and the day they bring it back;
  * the return day itself is not charged. Only obvious mistakes are caught here: the API applies the real rules.
  */
-export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPrefix = 'range', wide = false }: DateRangeFormProps) {
+export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPrefix = 'range', wide = false, summary = true }: DateRangeFormProps) {
   const noteId = useId()
   const today = todayIso()
   const [startDate, setStartDate] = useState(initial?.startDate ?? '')
@@ -78,6 +80,11 @@ export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPref
       <p id={noteId} className="range-note">
         You are not charged for the return day.
       </p>
+      {summary && isIsoDate(startDate) && isIsoDate(endDate) && endDate > startDate && (
+        <p className="range-summary" role="status">
+          {formatDate(startDate)} &rarr; {formatDate(endDate)}
+        </p>
+      )}
     </form>
   )
 }

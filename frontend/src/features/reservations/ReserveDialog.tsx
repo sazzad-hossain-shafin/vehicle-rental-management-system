@@ -1,3 +1,4 @@
+import { CalendarCheck, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
 import { Button, LinkButton } from '../../components/ui/Button'
@@ -16,8 +17,9 @@ interface ReserveDialogProps {
 }
 
 /**
- * The last step before booking. The price and dates shown are the ones the server quoted a moment ago; the server
- * decides again when the customer confirms, so this can still be refused (for example if someone else booked first).
+ * The last step before booking. The price and dates shown are the ones the server quoted a moment ago and are the
+ * same values sent when the customer confirms; the server decides again, so this can still be refused (for example
+ * if someone else booked first).
  */
 export function ReserveDialog({ open, onClose, vehicle, quote }: ReserveDialogProps) {
   const navigate = useNavigate()
@@ -43,24 +45,33 @@ export function ReserveDialog({ open, onClose, vehicle, quote }: ReserveDialogPr
 
   return (
     <Dialog open={open} onClose={close} title="Confirm your reservation">
+      <p className="muted dialog-lead">Check the details below. No payment is taken on this website.</p>
+
       <div className="summary-panel">
-      <dl className="detail-list">
-        <dt>Vehicle</dt>
-        <dd>{vehicle.displayName}</dd>
-        <dt>Pickup</dt>
-        <dd>{formatDate(quote.startDate)}</dd>
-        <dt>Return</dt>
-        <dd>{formatDate(quote.endDate)}</dd>
-        <dt>Charged for</dt>
-        <dd>{pluralize(quote.billableDays, 'day')}</dd>
-        <dt>Total</dt>
-        <dd>
-          {formatMoney(quote.totalCost)} <span className="muted">({quote.pricingDescription})</span>
-        </dd>
-      </dl>
+        <p className="summary-vehicle">
+          <CalendarCheck size={18} aria-hidden="true" /> {vehicle.displayName}
+        </p>
+        <dl className="detail-list">
+          <dt>Pickup</dt>
+          <dd>{formatDate(quote.startDate)}</dd>
+          <dt>Return</dt>
+          <dd>{formatDate(quote.endDate)}</dd>
+          <dt>Charged for</dt>
+          <dd>{pluralize(quote.billableDays, 'day')}</dd>
+          <dt>Price per day</dt>
+          <dd>{formatMoney(quote.dailyRate)}</dd>
+          <dt>Pricing</dt>
+          <dd>{quote.pricingDescription}</dd>
+        </dl>
+        <p className="summary-total">
+          <span>Total</span>
+          <strong>{formatMoney(quote.totalCost)}</strong>
+        </p>
       </div>
-      <p className="muted">
-        No payment is taken on this website. Staff hand the vehicle over at the rental desk on your pickup day.
+
+      <p className="muted fine-print dialog-note">
+        <ShieldCheck size={16} aria-hidden="true" /> Staff hand the vehicle over at the rental desk on your pickup day. You
+        can cancel until the day before pickup.
       </p>
 
       {conflict && (

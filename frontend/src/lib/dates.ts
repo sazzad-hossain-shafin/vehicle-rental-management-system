@@ -53,16 +53,23 @@ export function daysBetween(startIso: string, endIso: string): number {
   return Math.round((end - start) / 86_400_000)
 }
 
+/** A readable calendar day such as "9 Oct 2026" (day, month name, year: no US-style numeric order). */
 export function formatDate(iso: string): string {
   const ms = toUtcMs(iso)
   if (ms === null) return iso
   return new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
     day: 'numeric',
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(ms))
+}
+
+/** The day of the week for a calendar day, such as "Fri". */
+export function formatWeekday(iso: string): string {
+  const ms = toUtcMs(iso)
+  if (ms === null) return ''
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(new Date(ms))
 }
 
 export function formatDateTime(isoDateTime: string): string {
