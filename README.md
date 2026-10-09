@@ -123,6 +123,8 @@ docker compose ps
 curl http://localhost:8080/health
 ```
 
+Frontend work only? See [Running it](docs/frontend.md#running-it): `cd frontend && npm ci && npm start` opens the hot-reload site in your browser (it needs an API to show data; the page says so clearly when there is none).
+
 Then open the website at <http://localhost:8081> and register an account to make a reservation, or open <http://localhost:8080/scalar/v1> for the interactive API reference. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your generated `.env`, and use **Authorize** to paste the token. To run an end-to-end check against the running stack, use `bash scripts/smoke-test.sh`. To stop and delete everything including the database, use `docker compose down -v`.
 
 The Docker setup is for local development: it serves plain HTTP on `127.0.0.1` and has no TLS or deployment configuration. Details: [docs/docker.md](docs/docker.md).

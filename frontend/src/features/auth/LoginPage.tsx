@@ -1,3 +1,4 @@
+import { LogIn } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -61,10 +62,16 @@ export function LoginPage() {
   }
 
   return (
-    <div className="container page">
+    <div className="container auth-page">
       <div className="card auth-card">
         <form className="card-body form-grid" onSubmit={handleSubmit} noValidate aria-labelledby="login-title">
-          <h1 id="login-title">Sign in</h1>
+          <span className="auth-icon">
+            <LogIn size={22} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="login-title">Sign in</h1>
+            <p className="muted">Welcome back. Sign in to reserve vehicles and manage your reservations.</p>
+          </div>
 
           {sessionExpired && (
             <Alert
@@ -107,7 +114,7 @@ export function LoginPage() {
           <Button type="submit" loading={submitting} block>
             Sign in
           </Button>
-          <p className="muted">
+          <p className="muted auth-switch">
             New here? <Link to="/register">Create an account</Link>
           </p>
         </form>

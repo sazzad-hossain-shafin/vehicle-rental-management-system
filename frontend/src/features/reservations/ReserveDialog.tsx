@@ -43,6 +43,7 @@ export function ReserveDialog({ open, onClose, vehicle, quote }: ReserveDialogPr
 
   return (
     <Dialog open={open} onClose={close} title="Confirm your reservation">
+      <div className="summary-panel">
       <dl className="detail-list">
         <dt>Vehicle</dt>
         <dd>{vehicle.displayName}</dd>
@@ -57,6 +58,7 @@ export function ReserveDialog({ open, onClose, vehicle, quote }: ReserveDialogPr
           {formatMoney(quote.totalCost)} <span className="muted">({quote.pricingDescription})</span>
         </dd>
       </dl>
+      </div>
       <p className="muted">
         No payment is taken on this website. Staff hand the vehicle over at the rental desk on your pickup day.
       </p>

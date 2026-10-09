@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -81,9 +82,9 @@ function ReservationView({ reservation, justBooked }: { reservation: Reservation
 
   return (
     <div className="container page stack">
-      <p>
-        <Link to="/reservations">&larr; My reservations</Link>
-      </p>
+      <Link className="back-link" to="/reservations">
+        <ArrowLeft size={18} aria-hidden="true" /> My reservations
+      </Link>
 
       {justBooked && (
         <Alert tone="success" title="Reservation confirmed">
@@ -101,10 +102,10 @@ function ReservationView({ reservation, justBooked }: { reservation: Reservation
       )}
 
       <section className="card card-body" aria-labelledby="reservation-title">
-        <h1 id="reservation-title">{reservation.vehicleDisplayName}</h1>
-        <p>
+        <div className="detail-header">
+          <h1 id="reservation-title">{reservation.vehicleDisplayName}</h1>
           <ReservationStatusBadge reservation={reservation} />
-        </p>
+        </div>
 
         <dl className="detail-list">
           <dt>Reference</dt>

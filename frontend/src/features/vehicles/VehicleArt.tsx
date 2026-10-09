@@ -9,8 +9,8 @@ export function VehicleArt({ type }: { type: VehicleType }) {
   const Icon = type === 'Motorcycle' ? Bike : type === 'Van' ? Truck : Car
 
   return (
-    <div className="vehicle-art" aria-hidden="true">
-      <Icon size={72} strokeWidth={1.4} />
+    <div className="vehicle-art" data-type={type} aria-hidden="true">
+      <Icon size={72} strokeWidth={1.3} />
     </div>
   )
 }

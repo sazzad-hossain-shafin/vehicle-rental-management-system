@@ -1,3 +1,4 @@
+import { UserPlus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -60,11 +61,16 @@ export function RegisterPage() {
   const showGeneral = serverError !== null && hasUnmappedError(serverError, FORM_FIELDS)
 
   return (
-    <div className="container page">
+    <div className="container auth-page">
       <div className="card auth-card">
         <form className="card-body form-grid" onSubmit={handleSubmit} noValidate aria-labelledby="register-title">
-          <h1 id="register-title">Create an account</h1>
-          <p className="muted">An account lets you reserve vehicles and manage your reservations.</p>
+          <span className="auth-icon">
+            <UserPlus size={22} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="register-title">Create an account</h1>
+            <p className="muted">An account lets you reserve vehicles and manage your reservations.</p>
+          </div>
 
           {showGeneral && (
             <Alert tone="error" title="We could not create your account">
@@ -103,7 +109,7 @@ export function RegisterPage() {
           <Button type="submit" loading={submitting} block>
             Create account
           </Button>
-          <p className="muted">
+          <p className="muted auth-switch">
             Already registered? <Link to="/login">Sign in</Link>
           </p>
         </form>

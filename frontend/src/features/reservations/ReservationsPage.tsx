@@ -17,7 +17,10 @@ export function ReservationsPage() {
 
   return (
     <div className="container page">
-      <h1 className="page-heading">My reservations</h1>
+      <div className="page-intro">
+        <h1 className="page-heading">My reservations</h1>
+        <p className="muted">Your upcoming and past reservations, listed by pickup date.</p>
+      </div>
 
       {reservations.isPending ? (
         <LoadingBlock label="Loading your reservations" />
@@ -39,14 +42,14 @@ export function ReservationsPage() {
         <>
           <ul className="reservation-list" aria-label="Your reservations">
             {reservations.data.items.map((reservation) => (
-              <li key={reservation.id} className="card reservation-item">
+              <li key={reservation.id} className="card card-lift reservation-item">
                 <div>
                   <h2 className="reservation-title">{reservation.vehicleDisplayName}</h2>
                   <p className="muted">
                     Pickup {formatDate(reservation.startDate)} &middot; Return {formatDate(reservation.endDate)}
                   </p>
-                  <p>
-                    <ReservationStatusBadge reservation={reservation} /> &nbsp;
+                  <p className="meta-row">
+                    <ReservationStatusBadge reservation={reservation} />
                     <strong>{formatMoney(reservation.totalCost)}</strong>
                   </p>
                 </div>

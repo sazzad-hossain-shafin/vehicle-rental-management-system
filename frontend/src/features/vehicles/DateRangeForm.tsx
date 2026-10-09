@@ -1,5 +1,5 @@
-import { Search } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { CalendarDays, Search } from 'lucide-react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '../../components/ui/Button'
 import { TextField } from '../../components/ui/Field'
 import { addDays, todayIso, validateRange, type RangeErrors } from '../../lib/dates'
@@ -16,13 +16,16 @@ interface DateRangeFormProps {
   /** Extra controls placed before the button (for example a vehicle type). */
   children?: ReactNode
   idPrefix?: string
+  /** Wide layout for the home page: dates and button on one row from tablet width up. */
+  wide?: boolean
 }
 
 /**
  * Pickup and return dates. The customer picks the day they collect the vehicle and the day they bring it back;
  * the return day itself is not charged. Only obvious mistakes are caught here: the API applies the real rules.
  */
-export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPrefix = 'range' }: DateRangeFormProps) {
+export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPrefix = 'range', wide = false }: DateRangeFormProps) {
+  const noteId = useId()
   const today = todayIso()
   const [startDate, setStartDate] = useState(initial?.startDate ?? '')
   const [endDate, setEndDate] = useState(initial?.endDate ?? '')
@@ -42,11 +45,12 @@ export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPref
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="Choose your dates" className="form-grid">
+    <form onSubmit={handleSubmit} noValidate aria-label="Choose your dates" className={wide ? 'range-form range-wide' : 'range-form'}>
       <TextField
         label="Pickup date"
         type="date"
         name={`${idPrefix}-start`}
+        icon={<CalendarDays size={18} aria-hidden="true" />}
         min={today}
         value={startDate}
         onChange={(event) => handleStartChange(event.target.value)}
@@ -57,17 +61,23 @@ export function DateRangeForm({ initial, submitLabel, onSubmit, children, idPref
         label="Return date"
         type="date"
         name={`${idPrefix}-end`}
+        icon={<CalendarDays size={18} aria-hidden="true" />}
         min={startDate ? addDays(startDate, 1) : today}
         value={endDate}
         onChange={(event) => setEndDate(event.target.value)}
         error={errors.endDate}
-        hint="You are not charged for the return day."
+        describedBy={noteId}
         required
       />
       {children}
-      <Button type="submit">
-        <Search size={18} aria-hidden="true" /> {submitLabel}
-      </Button>
+      <div className="range-submit">
+        <Button type="submit">
+          <Search size={18} aria-hidden="true" /> {submitLabel}
+        </Button>
+      </div>
+      <p id={noteId} className="range-note">
+        You are not charged for the return day.
+      </p>
     </form>
   )
 }

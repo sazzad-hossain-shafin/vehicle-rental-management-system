@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -59,14 +60,19 @@ export function VehicleDetailPage() {
 
   return (
     <div className="container page">
-      <p>
-        <Link to="/vehicles">&larr; All vehicles</Link>
-      </p>
+      <Link className="back-link" to="/vehicles">
+        <ArrowLeft size={18} aria-hidden="true" /> All vehicles
+      </Link>
       <div className="split">
         <section className="card" aria-labelledby="vehicle-title">
           <VehicleArt type={data.vehicleType} />
           <div className="card-body">
-            <Badge tone="neutral">{data.vehicleType}</Badge>
+            <div className="meta-row">
+              <Badge tone="neutral">{data.vehicleType}</Badge>
+              <Badge tone={data.availabilityStatus === 'Available' ? 'success' : 'warning'}>
+                {data.availabilityStatus === 'Available' ? 'Available now' : 'Out right now'}
+              </Badge>
+            </div>
             <h1 id="vehicle-title">{data.displayName}</h1>
             <p className="muted">Model year {data.year}</p>
             <p className="price">
@@ -80,7 +86,7 @@ export function VehicleDetailPage() {
           </div>
         </section>
 
-        <section className="card card-body stack" aria-labelledby="book-title">
+        <section className="card card-body stack sticky" aria-labelledby="book-title">
           <h2 id="book-title">Check dates and price</h2>
           <DateRangeForm
             key={`${start}|${end}`}

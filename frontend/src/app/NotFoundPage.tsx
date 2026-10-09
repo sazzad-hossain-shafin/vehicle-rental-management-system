@@ -9,7 +9,7 @@ export function NotFoundPage() {
   return (
     <div className="container page">
       <EmptyState
-        icon={<SearchX size={40} aria-hidden="true" />}
+        icon={<SearchX aria-hidden="true" />}
         title="We could not find that page"
         action={<LinkButton to="/">Go to the home page</LinkButton>}
       >

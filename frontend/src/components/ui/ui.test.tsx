@@ -84,6 +84,17 @@ describe('loading, empty and error states', () => {
     expect(screen.getByRole('alert')).not.toHaveTextContent('secret detail')
   })
 
+  it('says the booking service is unavailable and offers a retry when the API cannot be reached', async () => {
+    const onRetry = vi.fn()
+    render(<ErrorState error={new ApiError({ status: 503, title: 'Service Unavailable' })} onRetry={onRetry} title="We could not load the vehicles" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('We could not load the vehicles')
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not reach the server/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/booking service may be starting up/i)
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
   it('explains a network failure without technical words', () => {
     render(<ErrorState error={new ApiError({ status: 0, title: 'Network error' })} />)
 
