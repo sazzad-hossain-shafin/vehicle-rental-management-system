@@ -1,0 +1,647 @@
+/*
+ * Page-level layout and the finishing touches of the premium refinement. Component basics live in components.css.
+ * Breakpoints are the same three as everywhere (40rem, 52rem, 72rem), written out because CSS variables do not work
+ * inside media queries.
+ */
+
+/* ---------- Application shell: header on top, content grows, footer at the bottom ---------- */
+/*
+ * The header, <main> and footer used to be loose siblings with no height of their own, so on a short page the footer
+ * sat directly under the content and the page background showed beneath it. The shell is at least one viewport
+ * tall and <main> takes the leftover space, which pushes the footer to the bottom of short pages while long pages
+ * simply grow. dvh follows the visible area on phones (browser toolbars); vh is the fallback for older browsers.
+ */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.app-shell > main {
+  flex: 1 0 auto;
+  width: 100%;
+}
+
+/* ---------- Buttons: a larger primary action ---------- */
+.btn-lg {
+  min-height: 3.25rem;
+  padding-inline: var(--space-5);
+  font-size: var(--text-lg);
+}
+
+/* ---------- Dates ---------- */
+.range-summary {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.fine-print {
+  font-size: var(--text-sm);
+}
+
+/* ---------- Vehicle details ---------- */
+.vehicle-hero {
+  overflow: hidden;
+}
+
+.vehicle-art-hero {
+  height: 14rem;
+  background:
+    radial-gradient(18rem 12rem at 20% 20%, rgb(255 255 255 / 0.7), transparent 70%),
+    linear-gradient(135deg, #cfe0ff, #eef3ff);
+}
+
+.vehicle-art-hero[data-type='Motorcycle'] {
+  background:
+    radial-gradient(18rem 12rem at 20% 20%, rgb(255 255 255 / 0.7), transparent 70%),
+    linear-gradient(135deg, #d9defc, #f3f1ff);
+}
+
+.vehicle-art-hero[data-type='Van'] {
+  background:
+    radial-gradient(18rem 12rem at 20% 20%, rgb(255 255 255 / 0.7), transparent 70%),
+    linear-gradient(135deg, #dbe2ec, #f6f8fb);
+}
+
+.vehicle-art-disc {
+  display: grid;
+  place-items: center;
+  width: 8.5rem;
+  height: 8.5rem;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.75);
+  box-shadow:
+    0 0 0 10px rgb(255 255 255 / 0.35),
+    var(--shadow-md);
+}
+
+.vehicle-art-hero svg {
+  width: 4.5rem;
+}
+
+.vehicle-hero h1 {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, var(--text-3xl));
+}
+
+.vehicle-hero .price {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-2xl);
+}
+
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.fact-grid > div {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.fact-grid dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.fact-grid dd {
+  margin: var(--space-1) 0 0;
+  font-weight: 600;
+}
+
+.booking-card {
+  border-color: var(--color-line-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.booking-card h2 {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xl);
+}
+
+.booking-sub {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.booking-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.quote-dates {
+  margin: 0;
+}
+
+/* The total is the one number the customer is deciding on, so it gets its own band. */
+.price-table tr.total th,
+.price-table tr.total td {
+  padding: var(--space-4);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+}
+
+.price-table tr.total th {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  font-weight: 700;
+}
+
+.price-table tr.total td {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: var(--text-2xl);
+}
+
+/* ---------- Reservation dialog ---------- */
+.dialog-body h2 {
+  font-size: var(--text-2xl);
+}
+
+.dialog-lead {
+  margin-bottom: var(--space-4);
+}
+
+.summary-vehicle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.summary-vehicle svg {
+  color: var(--color-brand);
+}
+
+.summary-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+  font-weight: 600;
+}
+
+.summary-total strong {
+  font-size: var(--text-3xl);
+  letter-spacing: -0.02em;
+  color: var(--color-brand-strong);
+}
+
+.dialog-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.dialog-note svg {
+  flex: none;
+  margin-top: 0.2rem;
+  color: var(--color-success);
+}
+
+@media (max-width: 39.99rem) {
+  dialog.dialog {
+    width: calc(100vw - 1rem);
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ---------- My reservations ---------- */
+.reservation-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  list-style: none;
+}
+
+.reservation-card.is-inactive {
+  background: var(--color-surface-muted);
+}
+
+.reservation-card.is-inactive .reservation-title,
+.reservation-card.is-inactive .reservation-total strong {
+  color: var(--color-ink-muted);
+}
+
+.reservation-icon {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: var(--radius);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.reservation-icon[data-type='Motorcycle'] {
+  background: #e8eaff;
+  color: #3730a3;
+}
+
+.reservation-icon[data-type='Van'] {
+  background: #e7ecf3;
+  color: #334155;
+}
+
+.reservation-main {
+  min-width: 0;
+}
+
+.reservation-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.reservation-head .reservation-title {
+  margin: 0;
+}
+
+.reservation-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  grid-column: 1 / -1;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+@media (min-width: 52rem) {
+  .reservation-card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .reservation-side {
+    grid-column: auto;
+    flex-direction: column;
+    align-items: flex-end;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+.reservation-total {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.reservation-total span {
+  font-size: var(--text-sm);
+}
+
+.reservation-total strong {
+  font-size: var(--text-xl);
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 52rem) {
+  .reservation-total {
+    align-items: flex-end;
+  }
+}
+
+.date-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.date-pair dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.date-pair dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.date-pair .weekday {
+  color: var(--color-ink-muted);
+  font-weight: 500;
+}
+
+.date-arrow {
+  flex: none;
+  color: var(--color-line-strong);
+}
+
+.date-pair-large {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  gap: var(--space-4) var(--space-5);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.date-pair-large dd {
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
+}
+
+.skeleton-icon {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: var(--radius);
+}
+
+/* ---------- Reservation details ---------- */
+@media (min-width: 60rem) {
+  .reservation-split {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+}
+
+.reservation-split {
+  margin-top: var(--space-4);
+}
+
+.detail-header h1 {
+  font-size: clamp(1.6rem, 1.2rem + 1.4vw, var(--text-2xl));
+}
+
+.section-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.price-list {
+  column-gap: 0;
+}
+
+.price-list dt {
+  padding-right: var(--space-5);
+}
+
+/* The total is the figure the customer cares about, so it gets the same highlighted band as the price quote. */
+.price-list .total-label,
+.price-list .total-value {
+  margin-top: var(--space-2);
+  padding-block: var(--space-4);
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
+  font-weight: 700;
+}
+
+.price-list .total-label {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-4);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.price-list .total-value {
+  padding-right: var(--space-4);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+}
+
+.reference {
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.rule-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.rule-note svg {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.cancel-box {
+  display: grid;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+/* ---------- My account ---------- */
+.account-grid {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+@media (min-width: 52rem) {
+  .account-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
+.profile-header h2 {
+  margin: 0;
+}
+
+.avatar {
+  width: 3.75rem;
+  height: 3.75rem;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: #fff;
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.quick-links ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quick-links a {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background-color var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.quick-links a svg:first-child {
+  color: var(--color-brand);
+}
+
+.quick-links a svg:last-child {
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  transition: transform var(--duration) var(--ease);
+}
+
+.quick-links a:hover {
+  background: var(--color-brand-soft);
+  border-color: var(--color-brand);
+  color: var(--color-ink);
+}
+
+.quick-links a:hover svg:last-child {
+  transform: translateX(3px);
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+}
+
+@media (min-width: 40rem) {
+  .stat-row {
+    grid-template-columns: repeat(2, minmax(0, 12rem));
+  }
+}
+
+.stat-row > div {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.stat-row dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.stat-row dd {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.rentals-card .section-head {
+  margin-bottom: var(--space-4);
+}
+
+.inline-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius);
+  color: var(--color-ink-muted);
+}
+
+.inline-empty p {
+  margin: 0;
+}
+
+.account-note {
+  margin: 0;
+}
+
+/* ---------- Finishing touches ---------- */
+.alert {
+  border-left-width: 4px;
+}
+
+.card {
+  border-color: var(--color-line);
+}
+
+.page-intro .page-heading {
+  letter-spacing: -0.03em;
+}
+
+.toolbar {
+  box-shadow: var(--shadow-sm);
+}
+
+.vehicle-card .art-frame {
+  overflow: hidden;
+}
+
+.vehicle-card:hover .vehicle-art svg {
+  transform: scale(1.05);
+}
+
+.vehicle-art svg {
+  transition: transform var(--duration) var(--ease);
+}
+
+.hero .lead {
+  text-wrap: balance;
+}
+
+.section-head h2 {
+  letter-spacing: -0.025em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-card:hover .vehicle-art svg,
+  .quick-links a:hover svg:last-child {
+    transform: none;
+  }
+}

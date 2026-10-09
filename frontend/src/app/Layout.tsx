@@ -26,7 +26,7 @@ export function Layout() {
   }
 
   return (
-    <>
+    <div className="app-shell">
       <a className="skip-link" href="#main">
         Skip to main content
       </a>
@@ -148,6 +148,6 @@ export function Layout() {
           </nav>
         </div>
       </footer>
-    </>
+    </div>
   )
 }

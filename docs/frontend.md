@@ -83,7 +83,7 @@ frontend/src/
   features/account/    profile and rentals
   lib/api/             the single HTTP client, error type, endpoint functions, generated schema
   lib/                 date and money helpers
-  styles/              design tokens, base styles, components (plain CSS, no framework; Inter variable font bundled locally)
+  styles/              design tokens, base styles, components, page layouts (plain CSS, no framework; Inter variable font bundled locally)
   test/                test setup and fake-API helpers
 frontend/e2e/          Playwright tests
 ```
@@ -156,3 +156,37 @@ The vehicle page, and the page shown when the API cannot be reached:
 
 ![Vehicle details](images/redesign/after-desktop-detail.png)
 ![API unavailable](images/redesign/after-desktop-offline.png)
+
+## Page layout and the sticky footer
+
+`Layout` wraps the skip link, header, `<main>` and footer in one `.app-shell` element (`styles/pages.css`): a column that is at least one viewport tall (`100dvh`, with `100vh` as the fallback for older browsers; `dvh` follows the visible area on phones when the browser toolbars move) in which `<main>` takes the leftover space (`flex: 1 0 auto`).
+
+- **Root cause of the old behaviour:** the header, `<main>` and footer were loose siblings with no height or flex rules, so `<main>` was only as tall as its content. On a short page (My reservations, My account, 404, sign in) the footer sat directly under the content and the page background showed beneath it.
+- **Result:** on a short page the footer ends exactly at the bottom of the window; on a long page it simply follows the content. No fixed positioning, magic padding or JavaScript is involved.
+
+## Dates
+
+The native date boxes show dates in the browser's own locale (a US-style `mm/dd/yyyy` on a US-locale browser). A web page cannot change that without replacing the native control, which would cost keyboard and screen-reader support and add a lot of code, so the boxes are kept. Instead, the page shows what was chosen in words (`9 Oct 2030 → 12 Oct 2030`) under the boxes, and every summary, card and dialog uses the same day-month-name-year format (`9 Oct 2030`). The document language is `en-AU`.
+
+## Not built (needs backend support first)
+
+- **Vehicle photographs, features and specifications:** the API has none, so the vehicle page shows a per-type illustration and only real fields (category, model year, status, price). Real images would need storage plus an API field (for example an image URL and a specification list) first.
+- **Upcoming / Past / Cancelled tabs on My reservations:** reservations are paged by the server and the list endpoint has no status filter, so tabs computed in the browser would be wrong on any page but the first. Each card shows its status badge instead. A `status` filter on `GET /me/reservations` would make tabs accurate.
+- **Edit profile:** there is no endpoint to change a customer's details.
+
+## Screenshots: layout and page refinement
+
+| Before | After |
+|---|---|
+| ![Reservations before](images/refinement/before-desktop-reservations.png) | ![Reservations after](images/refinement/after-desktop-reservations.png) |
+| ![Account before](images/refinement/before-desktop-account.png) | ![Account after](images/refinement/after-desktop-account.png) |
+| ![Vehicle before](images/refinement/before-desktop-detail.png) | ![Vehicle after](images/refinement/after-desktop-detail.png) |
+
+Reservation details, the confirmation dialog on desktop and mobile, and My reservations on mobile:
+
+![Reservation details](images/refinement/after-desktop-reservation-detail.png)
+![Confirmation dialog](images/refinement/after-desktop-dialog.png)
+![Confirmation dialog on a phone](images/refinement/after-mobile-dialog.png)
+![Reservations on a phone](images/refinement/after-mobile-reservations.png)
+
+The screenshots use demo data only (an `example.test` account and vehicles added for the demonstration).

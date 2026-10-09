@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, CalendarDays, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { Alert } from '../../components/ui/Alert'
@@ -57,6 +57,7 @@ export function VehicleDetailPage() {
   }
 
   const data = vehicle.data
+  const available = data.availabilityStatus === 'Available'
 
   return (
     <div className="container page">
@@ -64,38 +65,60 @@ export function VehicleDetailPage() {
         <ArrowLeft size={18} aria-hidden="true" /> All vehicles
       </Link>
       <div className="split">
-        <section className="card" aria-labelledby="vehicle-title">
-          <VehicleArt type={data.vehicleType} />
+        <section className="card vehicle-hero" aria-labelledby="vehicle-title">
+          <div className="art-frame">
+            <VehicleArt type={data.vehicleType} hero />
+            <span className="vehicle-art-label">{data.vehicleType}</span>
+          </div>
           <div className="card-body">
             <div className="meta-row">
-              <Badge tone="neutral">{data.vehicleType}</Badge>
-              <Badge tone={data.availabilityStatus === 'Available' ? 'success' : 'warning'}>
-                {data.availabilityStatus === 'Available' ? 'Available now' : 'Out right now'}
-              </Badge>
+              <Badge tone={available ? 'success' : 'warning'}>{available ? 'Available now' : 'Out right now'}</Badge>
             </div>
             <h1 id="vehicle-title">{data.displayName}</h1>
-            <p className="muted">Model year {data.year}</p>
             <p className="price">
               {formatMoney(data.dailyRate)} <small>per day</small>
             </p>
-            <p className="muted">
-              The total for your trip is calculated by our booking system for the dates you choose, so any longer-stay
-              pricing is applied for you. You are charged for each day from pickup up to, but not including, the return
-              day.
+            <dl className="fact-grid">
+              <div>
+                <dt>Category</dt>
+                <dd>{data.vehicleType}</dd>
+              </div>
+              <div>
+                <dt>Model year</dt>
+                <dd>{data.year}</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>{available ? 'Available' : 'Out'}</dd>
+              </div>
+            </dl>
+            <p className="muted fine-print">
+              Your total is calculated by our booking system for the dates you choose, including any longer-stay pricing.
+              The return day is not charged.
             </p>
           </div>
         </section>
 
-        <section className="card card-body stack sticky" aria-labelledby="book-title">
-          <h2 id="book-title">Check dates and price</h2>
+        <section className="card card-body stack sticky booking-card" aria-labelledby="book-title">
+          <div>
+            <h2 id="book-title">Check dates and price</h2>
+            <p className="muted booking-sub">Pick your pickup and return days to see the exact price.</p>
+          </div>
           <DateRangeForm
             key={`${start}|${end}`}
             idPrefix="detail"
+            summary={range === null}
             initial={{ startDate: start, endDate: end }}
             submitLabel="Get price"
             onSubmit={(value) => setParams({ start: value.startDate, end: value.endDate })}
           />
-          {range ? <QuotePanel vehicle={data} range={range} /> : <p className="muted">Choose your dates to see the price and availability.</p>}
+          {range ? (
+            <QuotePanel vehicle={data} range={range} />
+          ) : (
+            <p className="booking-empty muted">
+              <CalendarDays size={18} aria-hidden="true" /> Choose your dates to see the price and availability.
+            </p>
+          )}
         </section>
       </div>
     </div>
@@ -121,8 +144,8 @@ function QuoteResult({ vehicle, quote }: { vehicle: Vehicle; quote: Quote }) {
   const from = `${location.pathname}${location.search}`
 
   return (
-    <div className="stack" aria-live="polite">
-      <p>
+    <div className="stack quote" aria-live="polite">
+      <p className="quote-dates">
         Pickup <strong>{formatDate(quote.startDate)}</strong>, return <strong>{formatDate(quote.endDate)}</strong>.
       </p>
 
@@ -157,10 +180,7 @@ function QuoteResult({ vehicle, quote }: { vehicle: Vehicle; quote: Quote }) {
           tone="warning"
           title="Not available for those dates"
           actions={
-            <LinkButton
-              variant="secondary"
-              to={`/vehicles?start=${quote.startDate}&end=${quote.endDate}`}
-            >
+            <LinkButton variant="secondary" to={`/vehicles?start=${quote.startDate}&end=${quote.endDate}`}>
               See vehicles free for these dates
             </LinkButton>
           }
@@ -171,8 +191,8 @@ function QuoteResult({ vehicle, quote }: { vehicle: Vehicle; quote: Quote }) {
 
       {status === 'authenticated' && isCustomer(user) ? (
         <>
-          <Button block onClick={() => setConfirming(true)} disabled={!quote.isAvailable}>
-            Reserve these dates
+          <Button block size="lg" onClick={() => setConfirming(true)} disabled={!quote.isAvailable}>
+            <CircleCheck size={18} aria-hidden="true" /> Reserve these dates
           </Button>
           <ReserveDialog open={confirming} onClose={() => setConfirming(false)} vehicle={vehicle} quote={quote} />
         </>
@@ -182,10 +202,10 @@ function QuoteResult({ vehicle, quote }: { vehicle: Vehicle; quote: Quote }) {
         </Alert>
       ) : status === 'anonymous' ? (
         <div className="stack">
-          <LinkButton to="/login" state={{ from }} block>
+          <LinkButton to="/login" state={{ from }} block size="lg">
             Sign in to reserve
           </LinkButton>
-          <p className="muted">
+          <p className="muted auth-switch">
             No account yet? <Link to="/register" state={{ from }}>Create one</Link>
           </p>
         </div>

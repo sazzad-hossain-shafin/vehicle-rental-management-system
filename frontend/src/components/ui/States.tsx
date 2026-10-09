@@ -23,6 +23,26 @@ export function LoadingGrid({ count = 6, label = 'Loading' }: { count?: number; 
   )
 }
 
+/** Placeholder rows while a list of reservations loads. */
+export function LoadingList({ count = 3, label = 'Loading' }: { count?: number; label?: string }) {
+  return (
+    <div role="status" aria-live="polite">
+      <span className="visually-hidden">{label}…</span>
+      <ul className="reservation-list" aria-hidden="true">
+        {Array.from({ length: count }, (_, index) => (
+          <li key={index} className="card reservation-card">
+            <div className="skeleton skeleton-icon" />
+            <div className="reservation-main">
+              <div className="skeleton skeleton-line" style={{ width: '45%' }} />
+              <div className="skeleton skeleton-line" style={{ width: '70%' }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function LoadingBlock({ label = 'Loading' }: { label?: string }) {
   return (
     <div role="status" aria-live="polite" className="stack">

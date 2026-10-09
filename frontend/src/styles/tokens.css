@@ -71,9 +71,9 @@
   --text-display: 3.25rem;
 
   /* Elevation */
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
-  --shadow-md: 0 6px 20px rgb(15 23 42 / 0.08);
-  --shadow-lg: 0 18px 48px rgb(15 23 42 / 0.16);
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.05);
+  --shadow-md: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.07);
+  --shadow-lg: 0 2px 6px rgb(15 23 42 / 0.06), 0 24px 56px rgb(15 23 42 / 0.16);
 
   /* Motion */
   --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
