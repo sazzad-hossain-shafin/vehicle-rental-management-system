@@ -60,6 +60,23 @@ describe('my reservations (cards)', () => {
   })
 })
 
+describe('my account counts', () => {
+  it('uses the API totals, not the number of rows on the current page', async () => {
+    // Twelve of each exist on the server, but a page only carries two rows.
+    mockApi({
+      ...signedIn(),
+      'GET /api/v1/me/customer': json({ id: customerUser.customerId, customerNumber: 'WEB-1', name: 'Casey Jones' }),
+      'GET /api/v1/me/rentals': json(page([], { totalCount: 12, totalPages: 6, pageSize: 2 })),
+      'GET /api/v1/me/reservations': json(page([reservation(), reservation({ id: '55555555-5555-4555-8555-555555555555' })], { totalCount: 12, totalPages: 6, pageSize: 2 })),
+    })
+    renderWithProviders(<AppRoutes />, { route: '/account' })
+
+    const group = await screen.findByLabelText('Summary')
+    expect(within(group).getByText('Rentals').nextElementSibling).toHaveTextContent('12')
+    expect(within(group).getByText('Reservations').nextElementSibling).toHaveTextContent('12')
+  })
+})
+
 describe('my account', () => {
   it('shows the profile and takes the summary counts from the API totals', async () => {
     mockApi({
