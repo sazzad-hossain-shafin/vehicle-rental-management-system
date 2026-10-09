@@ -557,5 +557,45 @@ public class ReservationServiceTests
         _app.Clock.AdvanceDays(1);                                                     // Oct 4: the end date
         await Assert.ThrowsAsync<ConflictException>(() => _app.Reservations.PickUpAsync(b.Id));
     }
+
+    // ----- Quote -----
+
+    [Fact]
+    public async Task Quote_UsesThePricingPolicy_AndReservesNothing()
+    {
+        var (vehicle, alice, _) = await SetUpAsync();
+
+        QuoteDto shortQuote = await _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(5), Today.AddDays(8));
+        QuoteDto longQuote = await _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(5), Today.AddDays(12));
+
+        Assert.Equal(3, shortQuote.BillableDays);
+        Assert.Equal(300m, shortQuote.TotalCost);
+        Assert.Equal("Normal pricing", shortQuote.PricingDescription);
+        Assert.True(shortQuote.IsAvailable);
+        Assert.Equal(560m, longQuote.TotalCost);   // 7 days: long-term pricing
+        Assert.Empty(_app.ReservationRepository.All);
+
+        // A real reservation is stored at exactly the quoted price.
+        ReservationDto reservation = await ReserveAsync(alice.Id, vehicle.Id, 5, 8);
+        Assert.Equal(shortQuote.TotalCost, reservation.TotalCost);
+        Assert.Equal(shortQuote.PricingDescription, reservation.PricingDescription);
+    }
+
+    [Fact]
+    public async Task Quote_ReportsWhetherTheVehicleIsFree_AndRejectsBadInput()
+    {
+        var (vehicle, alice, _) = await SetUpAsync();
+        await ReserveAsync(alice.Id, vehicle.Id, 5, 8);
+
+        Assert.False((await _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(6), Today.AddDays(9))).IsAvailable);
+        Assert.True((await _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(8), Today.AddDays(9))).IsAvailable);
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            _app.Reservations.GetQuoteAsync(Guid.NewGuid(), Today.AddDays(5), Today.AddDays(8)));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(5), Today.AddDays(5)));
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _app.Reservations.GetQuoteAsync(vehicle.Id, Today.AddDays(-1), Today.AddDays(2)));
+    }
 }
 

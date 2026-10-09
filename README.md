@@ -8,11 +8,12 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 
 ## Highlights
 
+- **A customer website** (React, TypeScript): search availability for your dates, see the server's exact price, sign up, reserve, review and cancel reservations. Sessions use an HttpOnly cookie, so the token is never visible to page scripts. See [docs/frontend.md](docs/frontend.md).
 - **Layered architecture** with strictly inward dependencies: Domain, Application, Infrastructure and an HTTP API. The Domain has no framework dependencies, and the Application layer has no EF Core or web dependencies.
 - **PostgreSQL persistence** through EF Core with explicit migrations, unique business keys, protected rental history and a database rule that makes double-renting a vehicle impossible.
 - **Authentication and authorization** with ASP.NET Core Identity, JWT bearer tokens, Admin/Staff/Customer roles, default-deny endpoints and customer ownership checks.
 - **Reservations with a database-enforced no-double-booking guarantee**: customers reserve a vehicle for a date range. A PostgreSQL exclusion constraint stops overlapping reservations, and a per-vehicle row lock stops a walk-in rental and a reservation from racing each other, even across several API instances.
-- **748 automated tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database, and concurrency tests for double booking and double pickup.
+- **760 backend tests**, including tests that run the real HTTP pipeline against a real PostgreSQL database, and concurrency tests for double booking and double pickup.
 - **One-command local environment** with Docker Compose: PostgreSQL, a one-shot migration job and the API.
 - **CI workflow** for build, tests, vulnerability policy and Docker verification. It runs on GitHub Actions on every push and pull request (see [Continuous integration](#continuous-integration)).
 
@@ -24,7 +25,8 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 | Web | ASP.NET Core Minimal APIs, Problem Details (RFC 9457), OpenAPI with Scalar (Development only) |
 | Data | Entity Framework Core 10, Npgsql, PostgreSQL 17 |
 | Security | ASP.NET Core Identity, JWT Bearer authentication |
-| Testing | xUnit |
+| Frontend | React 19, TypeScript (strict), Vite, React Router, TanStack Query, plain CSS design tokens |
+| Testing | xUnit, Vitest and React Testing Library, Playwright |
 | Operations | Docker, Docker Compose, GitHub Actions, Dependabot configuration |
 
 ## What it can do today
@@ -36,6 +38,7 @@ A production-style vehicle rental backend built with ASP.NET Core, EF Core and P
 - **Pricing:** strategy-based (normal, 10% promotional discount, 20% long-term discount for 7+ days). The price is calculated when the rental starts and stored on the rental, so history never changes when rates change.
 - **Accounts:** sign in, register as a customer, admin-created staff accounts, and `/me` endpoints for a customer's own profile, rentals and reservations.
 - **Operations:** paged lists, consistent Problem Details errors, readiness and liveness health endpoints, OpenAPI documentation.
+- **Website:** a responsive customer site over the same API: browse and filter vehicles, availability by dates, an exact server-side quote, registration and sign-in, reserving, a reservations dashboard with cancellation, and an account page with rental history.
 - **Console client:** a small text-menu client kept as a secondary demo.
 
 ## Architecture
@@ -120,7 +123,7 @@ docker compose ps
 curl http://localhost:8080/health
 ```
 
-Then open <http://localhost:8080/scalar/v1> for the interactive API reference. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your generated `.env`, and use **Authorize** to paste the token. To run an end-to-end check against the running stack, use `bash scripts/smoke-test.sh`. To stop and delete everything including the database, use `docker compose down -v`.
+Then open the website at <http://localhost:8081> and register an account to make a reservation, or open <http://localhost:8080/scalar/v1> for the interactive API reference. Sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from your generated `.env`, and use **Authorize** to paste the token. To run an end-to-end check against the running stack, use `bash scripts/smoke-test.sh`. To stop and delete everything including the database, use `docker compose down -v`.
 
 The Docker setup is for local development: it serves plain HTTP on `127.0.0.1` and has no TLS or deployment configuration. Details: [docs/docker.md](docs/docker.md).
 
@@ -145,7 +148,9 @@ All routes are under `/api/v1`. The full list, conventions, paging and errors ar
 | GET | `/vehicles` (paged; filters `vehicleType`, `maxDailyRate`, `availability`) | Public |
 | POST | `/auth/login`, `/auth/register` | Public |
 | GET | `/me`, `/me/customer`, `/me/rentals` | Signed in / Customer |
-| GET | `/vehicles/availability?startDate=&endDate=` | Signed in |
+| GET | `/vehicles/availability?startDate=&endDate=` | Public |
+| GET | `/vehicles/{id}/quote?startDate=&endDate=` | Public (price from the pricing policy, nothing reserved) |
+| POST, DELETE | `/auth/session` | Public (browser sign-in / sign-out with an HttpOnly cookie) |
 | POST, GET | `/me/reservations`, `/me/reservations/{id}` | Customer (own data only) |
 | POST | `/me/reservations/{id}/cancel` | Customer (own, before the start date) |
 | GET, POST | `/reservations`, `/reservations/{id}/cancel`, `/reservations/{id}/pickup` | Staff, Admin |
@@ -170,6 +175,7 @@ Authorization: Bearer <access token>
 ## Security
 
 - **Accounts:** ASP.NET Core Identity. Password hashing, validation and lockout (5 failed attempts, 15 minutes) are Identity's; nothing is hashed by hand.
+- **Browser sessions:** the website signs in through `POST /auth/session`, which sets the token as an HttpOnly, SameSite=Strict cookie (never readable by scripts, nothing in web storage); cookie-authenticated writes also need an anti-CSRF header, and the site is served same-origin so no CORS is enabled. Details: [ADR 006](docs/architecture/006-customer-website-and-cookie-session.md).
 - **Tokens:** JWT bearer, signed with HMAC-SHA256, 30-minute lifetime, validated for signature, issuer, audience and expiry. The API refuses to start without a strong signing key.
 - **Authorization:** Admin, Staff and Customer roles mapped to named policies. Every endpoint requires sign-in unless explicitly marked anonymous, and a test checks every mapped endpoint against the documented access matrix.
 - **Ownership / IDOR protection:** customers can reach only their own data, using the customer ID from the signed token. A customer's reservation request has no customer field at all.
@@ -184,14 +190,16 @@ Not implemented yet: refresh tokens, multi-factor authentication, email verifica
 | Project | Tests | Covers |
 |---|---:|---|
 | Domain | 133 | Entity invariants, rental and reservation dates and lifecycles, pricing strategies and policy |
-| Application | 154 | Use-case services (including availability, booking, cancellation and pickup) against in-memory fakes and a controlled clock |
+| Application | 156 | Use-case services (including availability, booking, cancellation and pickup) against in-memory fakes and a controlled clock |
 | Infrastructure integration | 142 | EF mapping, migrations, constraints, the no-overlap exclusion constraint, concurrent booking and pickup races, Identity, on real PostgreSQL |
-| API | 319 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, the reservation flow, on real PostgreSQL |
-| **Total** | **748** | **748 passed, 0 failed, 0 skipped** when PostgreSQL is available |
+| API | 329 | HTTP contracts, Problem Details, authentication, role policies, customer ownership, the reservation flow, on real PostgreSQL |
+| **Total** | **760** | **760 passed, 0 failed, 0 skipped** when PostgreSQL is available |
 
 Without a configured database, the PostgreSQL-backed tests are skipped and the rest still run; CI fails if any test is skipped. To run them all, point `VEHICLERENTAL_TEST_CONNECTION` at a PostgreSQL server (see [docs/development.md](docs/development.md#database-integration-tests)). The tests create and drop their own databases.
 
-The Docker smoke test (`scripts/smoke-test.sh`) runs 38 end-to-end checks against the running Compose stack: health, public access, 401/403, customer isolation, a full rental, and the reservation flow (availability, booking, overlap and adjacent dates, cancellation, desk booking and pickup).
+The website has 95 unit and component tests (Vitest, React Testing Library) and 11 Playwright end-to-end tests that run against the real website, API and PostgreSQL with nothing mocked.
+
+The Docker smoke test (`scripts/smoke-test.sh`) runs 48 end-to-end checks against the running Compose stack: health, public access, 401/403, customer isolation, a full rental, and the reservation flow (availability, quote, booking, overlap and adjacent dates, cancellation, desk booking and pickup) and the browser cookie session.
 
 ## Continuous integration
 
@@ -201,6 +209,8 @@ The GitHub Actions workflow in [.github/workflows/ci.yml](.github/workflows/ci.y
 - restore, a Release build with warnings as errors and a whitespace format check
 - a NuGet vulnerability policy (High and Critical fail; outdated packages do not)
 - all tests against a PostgreSQL 17 service container, failing if any test is skipped
+- the website: strict typecheck, ESLint, unit and component tests, the production build and `npm audit` (high or critical fails)
+- Playwright end-to-end tests against the whole stack in Docker
 - the Docker images, Compose startup, migration and the HTTP smoke test
 
 **Status:** the workflow runs on GitHub-hosted runners; see the badge above and the [Actions tab](https://github.com/sazzad-hossain-shafin/vehicle-rental-management-system/actions). Its first hosted run found one real Linux-only defect (a culture-dependent pricing name), which was fixed. Changes to `main` go through pull requests with these checks required; see [docs/ci.md](docs/ci.md) and the [contributing workflow](docs/development.md#contributing-workflow).
@@ -209,6 +219,7 @@ The GitHub Actions workflow in [.github/workflows/ci.yml](.github/workflows/ci.y
 
 ```
 src/            Domain, Application, Infrastructure, Api and Console projects
+frontend/       The customer website (React, TypeScript, Vite) with its unit tests and Playwright tests
 tests/          Domain, Application, Infrastructure integration and API tests
 docs/           API guide, authentication, Docker, CI, architecture notes and ADRs
 scripts/        Environment setup, smoke test and CI helper scripts
@@ -222,7 +233,8 @@ Planned, not implemented:
 
 - Reservation extras: payments or deposits, notifications, cancellation fees, automatic expiry of no-shows, and a staff calendar view
 - Refresh tokens, email verification, password reset and MFA
-- A frontend client
+- Staff and admin screens for the rental desk (the customer website exists; the desk still uses the API)
+- Website deployment with TLS
 - Observability (structured logging, metrics, tracing)
 - Production deployment, TLS and secret management
 - Container image scanning and signing

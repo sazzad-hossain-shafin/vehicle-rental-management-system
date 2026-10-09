@@ -216,3 +216,10 @@ $RECYCLE.BIN/
 
 # CI diagnostics collected on failure
 compose-diagnostics/
+
+# Playwright
+playwright-report/
+test-results/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example

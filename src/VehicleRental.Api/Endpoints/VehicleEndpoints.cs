@@ -27,16 +27,29 @@ internal static class VehicleEndpoints
         // A literal segment always wins over the "{id}" parameter in routing.
         group.MapGet("/availability", ListAvailableVehiclesAsync)
             .WithName("ListAvailableVehicles")
-            .RequireAuthorization()
+            .AllowAnonymous()
             .WithSummary("Lists the vehicles that are free for a date range, one page at a time")
             .WithDescription(
                 "The period is the half-open interval [startDate, endDate): a vehicle booked until the start date " +
                 "is still free, and so is one booked from the end date. A vehicle is free when it has no active " +
-                "reservation and no active rental overlapping the period. Requires a sign-in.")
+                "reservation and no active rental overlapping the period. Public, like browsing vehicles: it reveals " +
+                "nothing beyond which vehicles are free. Booking one still needs a sign-in.")
             .Produces<PagedResult<VehicleDto>>()
             .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status400BadRequest);
+
+        group.MapGet("/{id}/quote", GetQuoteAsync)
+            .WithName("GetVehicleQuote")
+            .AllowAnonymous()
+            .WithSummary("Quotes the price of a vehicle for a date range, without reserving it")
+            .WithDescription(
+                "Uses the same pricing policy as a reservation (long-term pricing from 7 days). The price is only " +
+                "fixed when a reservation is made, and isAvailable is a snapshot that does not hold the vehicle. " +
+                "The period is the half-open interval [startDate, endDate).")
+            .Produces<QuoteDto>()
+            .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status401Unauthorized);
+            .ProducesProblem(StatusCodes.Status404NotFound);
 
         group.MapGet("/{id}", GetVehicleAsync)
             .WithName("GetVehicleById")
@@ -145,6 +158,32 @@ internal static class VehicleEndpoints
             query.Page,
             query.PageSize,
             cancellationToken));
+    }
+
+    private static async Task<IResult> GetQuoteAsync(
+        Guid id,
+        [AsParameters] QuoteQuery query,
+        ReservationService reservations,
+        CancellationToken cancellationToken)
+    {
+        var errors = new Dictionary<string, string[]>();
+
+        if (query.StartDate is null)
+        {
+            errors["startDate"] = ["startDate is required (yyyy-MM-dd)."];
+        }
+
+        if (query.EndDate is null)
+        {
+            errors["endDate"] = ["endDate is required (yyyy-MM-dd)."];
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        return Results.Ok(await reservations.GetQuoteAsync(id, query.StartDate!.Value, query.EndDate!.Value, cancellationToken));
     }
 
     private static async Task<IResult> GetVehicleAsync(

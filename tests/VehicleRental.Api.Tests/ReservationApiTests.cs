@@ -52,13 +52,70 @@ public class ReservationApiTests : ApiTestBase
     // ----- Availability -----
 
     [DatabaseFact]
-    public async Task Availability_RequiresASignIn()
+    public async Task Availability_IsPublic_LikeBrowsingVehicles()
     {
+        await Client.CreateVehicleAsync("AAA-111");
         using var anonymous = Api.CreateAnonymousClient();
 
         var response = await anonymous.GetAsync($"{V1}/vehicles/availability?startDate={Date(3)}&endDate={Date(5)}");
 
-        await response.AssertProblemAsync(HttpStatusCode.Unauthorized);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single((await response.ReadAsync<PagedResult<VehicleDto>>()).Items);
+    }
+
+    // ----- Quote -----
+
+    [DatabaseFact]
+    public async Task Quote_IsPublic_AndMatchesWhatAReservationWouldStore()
+    {
+        var alice = await Api.CreateCustomerClientAsync("Alice");
+        var vehicle = await Client.CreateVehicleAsync("AAA-111", dailyRate: 100m);
+        using var anonymous = Api.CreateAnonymousClient();
+
+        var shortQuote = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate={Date(5)}&endDate={Date(8)}");
+        var longQuote = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate={Date(5)}&endDate={Date(12)}");
+
+        Assert.Equal(HttpStatusCode.OK, shortQuote.StatusCode);
+        var quote = await shortQuote.ReadAsync<QuoteDto>();
+        Assert.Equal(3, quote.BillableDays);
+        Assert.Equal(100m, quote.DailyRate);
+        Assert.Equal(300m, quote.TotalCost);
+        Assert.Equal("Normal pricing", quote.PricingDescription);
+        Assert.True(quote.IsAvailable);
+
+        var longTerm = await longQuote.ReadAsync<QuoteDto>();
+        Assert.Equal(560m, longTerm.TotalCost);                      // 7 days: long-term pricing, no promotion
+        Assert.Contains("Long-term", longTerm.PricingDescription);
+
+        // The real reservation is stored at exactly the quoted price.
+        var reservation = await ReserveAsync(alice.Client, vehicle.Id, 5, 8);
+        Assert.Equal(quote.TotalCost, reservation.TotalCost);
+        Assert.Equal(quote.PricingDescription, reservation.PricingDescription);
+
+        // Once reserved, the same dates are reported as not available, and quoting reserved nothing extra.
+        var after = await (await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate={Date(5)}&endDate={Date(8)}")).ReadAsync<QuoteDto>();
+        Assert.False(after.IsAvailable);
+        Assert.Equal(1, (await (await Client.GetAsync($"{V1}/reservations")).ReadAsync<PagedResult<ReservationDto>>()).TotalCount);
+    }
+
+    [DatabaseFact]
+    public async Task Quote_ChecksTheInput()
+    {
+        var vehicle = await Client.CreateVehicleAsync("AAA-111");
+        using var anonymous = Api.CreateAnonymousClient();
+
+        var missing = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote");
+        var backwards = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate={Date(5)}&endDate={Date(3)}");
+        var past = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate={Date(-3)}&endDate={Date(1)}");
+        var malformed = await anonymous.GetAsync($"{V1}/vehicles/{vehicle.Id}/quote?startDate=soon&endDate={Date(3)}");
+        var unknown = await anonymous.GetAsync($"{V1}/vehicles/{Guid.NewGuid()}/quote?startDate={Date(3)}&endDate={Date(5)}");
+
+        var body = await missing.AssertProblemAsync(HttpStatusCode.BadRequest);
+        Assert.True(body.GetProperty("errors").TryGetProperty("startDate", out _));
+        await backwards.AssertProblemAsync(HttpStatusCode.BadRequest);
+        await past.AssertProblemAsync(HttpStatusCode.BadRequest);
+        await malformed.AssertProblemAsync(HttpStatusCode.BadRequest);
+        await unknown.AssertProblemAsync(HttpStatusCode.NotFound);
     }
 
     [DatabaseFact]

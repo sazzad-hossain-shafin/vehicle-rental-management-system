@@ -83,6 +83,25 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+
+// A request authenticated by the session cookie must prove it came from a script on this origin (see SessionCookie).
+app.Use(async (context, next) =>
+{
+    if (context.Items.ContainsKey(SessionCookie.UsedKey)
+        && !SessionCookie.IsSafeMethod(context.Request.Method)
+        && !SessionCookie.HasCsrfHeader(context.Request))
+    {
+        await Results.Problem(
+            statusCode: StatusCodes.Status403Forbidden,
+            title: "The request was not accepted.",
+            detail: $"The {SessionCookie.CsrfHeaderName} header is required.").ExecuteAsync(context);
+
+        return;
+    }
+
+    await next();
+});
+
 app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())

@@ -208,6 +208,7 @@ public class JwtValidationTests : IDisposable
         for (Exception? current = error; current is not null; current = current.InnerException)
         {
             parts.Add(current.Message);
+            parts.Add($"[{current.GetType().Name}]");
 
             if (current is OptionsValidationException validation)
             {

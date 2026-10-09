@@ -30,5 +30,19 @@ public sealed record ReservationDto(
     decimal TotalCost,
     bool IsExpired);
 
+/// <summary>
+/// The price the pricing policy would quote for a vehicle over a period, without reserving anything. The real quote is
+/// fixed when a reservation is made; <c>IsAvailable</c> is only a snapshot and does not hold the vehicle.
+/// </summary>
+public sealed record QuoteDto(
+    Guid VehicleId,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    int BillableDays,
+    decimal DailyRate,
+    string PricingDescription,
+    decimal TotalCost,
+    bool IsAvailable);
+
 /// <summary>The result of picking a reservation up: the fulfilled reservation and the rental it started.</summary>
 public sealed record PickupResultDto(ReservationDto Reservation, RentalDto Rental);

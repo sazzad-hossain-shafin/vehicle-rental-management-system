@@ -1,0 +1,49 @@
+/* Design tokens. Colour pairs below were chosen for at least WCAG AA contrast (4.5:1 for text). */
+:root {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-line: #dbe1ea;
+  --color-line-strong: #94a3b8;
+
+  --color-dark: #0b1220;
+  --color-dark-2: #172033;
+  --color-on-dark: #f8fafc;
+  --color-on-dark-muted: #cbd5e1;
+
+  --color-brand: #1d4ed8;
+  --color-brand-strong: #1e3a8a;
+  --color-brand-soft: #e8efff;
+  --color-on-brand: #ffffff;
+
+  --color-success: #166534;
+  --color-success-bg: #dcfce7;
+  --color-warning: #8a3b0c;
+  --color-warning-bg: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fee2e2;
+  --color-info: #1e40af;
+  --color-info-bg: #dbeafe;
+
+  --radius-sm: 6px;
+  --radius: 12px;
+  --radius-lg: 20px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4.5rem;
+
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
+  --shadow-md: 0 4px 16px rgb(15 23 42 / 0.1);
+
+  --content-width: 72rem;
+  --focus-ring: 0 0 0 3px #ffffff, 0 0 0 6px #1d4ed8;
+}

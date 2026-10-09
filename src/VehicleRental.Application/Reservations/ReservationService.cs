@@ -73,6 +73,40 @@ public sealed class ReservationService
     }
 
     /// <summary>
+    /// What a reservation of this vehicle for the period would cost, using the same pricing policy as a real
+    /// reservation (without the promotion, which only the desk can grant), and whether the vehicle is free right now.
+    /// Nothing is reserved or stored.
+    /// </summary>
+    /// <exception cref="ArgumentException">The period breaks the booking rules.</exception>
+    /// <exception cref="NotFoundException">The vehicle does not exist.</exception>
+    public async Task<QuoteDto> GetQuoteAsync(
+        Guid vehicleId,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        DateOnly today = Today();
+        Reservation.ValidatePeriod(startDate, endDate, today);
+
+        Vehicle vehicle = await _vehicles.GetByIdAsync(vehicleId, cancellationToken)
+                          ?? throw new NotFoundException($"Vehicle '{vehicleId}' was not found.");
+
+        int billableDays = Rental.CalculateBillableDays(startDate, endDate);
+        IVehiclePricingStrategy strategy = PricingPolicy.SelectStrategy(billableDays, promotionalDiscountRequested: false);
+        bool isAvailable = await _availability.IsAvailableAsync(vehicle.Id, startDate, endDate, today, cancellationToken);
+
+        return new QuoteDto(
+            vehicle.Id,
+            startDate,
+            endDate,
+            billableDays,
+            vehicle.DailyRate,
+            strategy.Name,
+            strategy.CalculateCost(vehicle.DailyRate, billableDays),
+            isAvailable);
+    }
+
+    /// <summary>
     /// Reserves a vehicle for a customer and stores the quoted price.
     /// </summary>
     /// <exception cref="ArgumentException">The dates break the booking rules.</exception>

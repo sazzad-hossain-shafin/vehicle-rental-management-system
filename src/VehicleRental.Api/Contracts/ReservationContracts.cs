@@ -60,6 +60,11 @@ public sealed record AvailabilityQuery(
     int Page = 1,
     int PageSize = Paging.DefaultPageSize);
 
+/// <summary>Query-string parameters of the quote request.</summary>
+/// <param name="StartDate">The first day, as yyyy-MM-dd (required).</param>
+/// <param name="EndDate">The day the vehicle is returned, as yyyy-MM-dd (required, not held).</param>
+public sealed record QuoteQuery(DateOnly? StartDate = null, DateOnly? EndDate = null);
+
 /// <summary>Query-string filter and paging of the staff reservation list.</summary>
 /// <param name="Status">Only reservations with this status: Active, Cancelled or Fulfilled (any letter case).</param>
 /// <param name="Page">The page number, starting at 1.</param>
