@@ -1,6 +1,6 @@
 # ADR 007: Multi-company tenancy
 
-Status: accepted as a direction. The Row-Level Security part is **conditional** on the proof of concept in the next pull request (PR 14A-2): if that spike shows RLS cannot be made safe in this code base, this record is amended with a safer design before any production tenant code is written.
+Status: accepted. The Row-Level Security part was conditional on a proof of concept; that spike succeeded (PR 14A-2, [results](../../tests/VehicleRental.TenantIsolation.Spike/README.md)), so the decision stands, with the production requirements recorded in [Spike outcome](#spike-outcome-and-production-requirements) below.
 
 Nothing in this record changes how the system behaves today. It describes where the system is going and the rules the next changes must follow. The supporting documents are in [../multi-tenancy/](../multi-tenancy/README.md).
 
@@ -28,7 +28,7 @@ Every tenant-owned table gets a `CompanyId`. Isolation is enforced three times, 
 
 Schema-per-tenant and database-per-tenant were rejected: they multiply migrations, connection pools and backups for no benefit at this scale. Filters alone were rejected because one forgotten `IgnoreQueryFilters()` is a data breach. RLS alone was rejected because it is hard to debug and gives no application-level error messages.
 
-The RLS setting must be **transaction-local** (`set_config(..., true)` / `SET LOCAL`), not session-scoped with a manual reset, so a connection returned to the pool by any path (success, exception, rollback, cancellation) cannot carry a tenant to the next request. Whether this is achievable with EF Core and Npgsql in this architecture is exactly what PR 14A-2 must prove or disprove.
+The RLS setting must be **transaction-local** (`set_config(..., true)` / `SET LOCAL`), not session-scoped with a manual reset, so a connection returned to the pool by any path (success, exception, rollback, cancellation) cannot carry a tenant to the next request. PR 14A-2 proved this works with EF Core and Npgsql (see below).
 
 ### 2. Tenant resolution: never trust a browser-supplied company
 
@@ -92,10 +92,28 @@ Staff are added by a single-use invitation link. The token is 256 random bits, o
 - Revenue figures, when built, are "agreed rental value" taken from stored quotes. There is no payment concept in the system, so nothing may claim money was collected.
 - Vehicle photographs and specifications are separate later features that need new tables, storage and API fields. They are not faked in the meantime.
 
+## Spike outcome and production requirements
+
+PR 14A-2 built an isolated proof of concept with 47 adversarial tests against a real PostgreSQL server (pooled connection reuse including with the driver's reset disabled, 300 concurrent requests from three companies over a pool of six, alternating tenants, exceptions, database errors, cancellation, missing and malformed tenants, role safety, cross-company reads, updates, deletes and aggregates). **No leak was found**, the harness is shown to detect leaks (negative controls and a mutation check in which disabling RLS made 18 of 25 tests fail), and the booking row lock and no-overlap exclusion constraint kept working under RLS. Full results, findings and limits: [spike README](../../tests/VehicleRental.TenantIsolation.Spike/README.md).
+
+The spike code is **not** production code. The production implementation must meet these requirements:
+
+1. **Transaction-local tenant setting.** The tenant is applied with `set_config('app.company_id', @id, true)` inside the transaction, by an EF Core transaction interceptor. A session-scoped setting is never used: it leaks when the driver does not reset the connection, and the driver's reset can hide that mistake.
+2. **Explicit transactions for tenant-scoped reads.** Outside a transaction there is no setting and RLS returns nothing. Tenant code reads inside a transaction, and a guard refuses tenant commands outside one instead of silently returning empty results.
+3. **Writes are transactional too.** EF Core sends a single-statement `SaveChanges` without a transaction, so tenant contexts use `AutoTransactionBehavior.Always` (or an equivalent approach proven by tests).
+4. **A separate runtime database role** that is not the table owner, not a superuser and has no `BYPASSRLS`. Migrations run as a different, owning role. Today's Docker Compose uses one owner role for the API and CI's database user is a superuser; both change when tenancy is activated, and the application tests must run as the runtime role.
+5. **Startup checks for unsafe roles.** The API refuses to start (or reports unhealthy) if its connection role is a superuser or has `BYPASSRLS`, if a tenant table lacks RLS, or if it owns a tenant table without `FORCE ROW LEVEL SECURITY`.
+6. **Composite tenant-aware foreign keys.** Foreign-key checks ignore RLS, so a plain foreign key lets one company reference another company's row (proven). Every reference between tenant tables includes `CompanyId`.
+7. **Company-scoped unique constraints.** A unique key across all companies leaks the existence of another company's data through duplicate-key errors (proven). `Vehicles.RegistrationNumber` and `Customers.CustomerNumber` become unique per company.
+8. **Fail closed.** A missing, empty or malformed tenant returns no rows and refuses writes; a context with no company may not run any command.
+9. **Integration with `UnitOfWork` and the booking guarantees.** The unit of work begins the tenant transaction first and `LockVehicleAsync` joins it; the vehicle row lock, the exclusion constraint and the one-active-rental index are unchanged, and the existing booking race tests are re-run as the runtime role.
+10. **PgBouncer transaction pooling is not verified.** The setting is transaction-local, so it should work, but this was not tested and must not be assumed supported until it is.
+11. **RLS does not protect against arbitrary SQL execution by a compromised application role.** That role can set the same setting. RLS here defends against bugs (a forgotten filter, a wrong query), not against an attacker who can already run arbitrary SQL as the application role. Compensating controls: parameterised EF queries only, the command guard, review of any raw SQL, and a role per company as the heavier upgrade path if the risk changes.
+
 ## Plan
 
 | PR | Content |
 |---|---|
 | 14A-1 | This record and the supporting documents. No code. |
-| 14A-2 | An isolated RLS and connection-pooling proof of concept with adversarial tests. No production table is touched. |
+| 14A-2 | An isolated RLS and connection-pooling proof of concept with adversarial tests. No production table is touched. **Done** (47 tests; outcome above). |
 | later (each needs approval) | schema expand, tenant context, backfill, repository scoping, contract migration, authorization, isolation test suite, slug routes in the website; then registration and invitations (14B) |
