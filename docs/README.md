@@ -21,6 +21,8 @@ Start with the [project README](../README.md) for an overview and the Docker qui
   - [ADR 004: Reservations, availability and pickup](architecture/004-reservations.md)
   - [ADR 005: Serialising bookings of one vehicle with a row lock](architecture/005-vehicle-booking-lock.md)
   - [ADR 006: Customer website and the HttpOnly cookie session](architecture/006-customer-website-and-cookie-session.md)
+  - [ADR 007: Multi-company tenancy](architecture/007-multi-company-tenancy.md) (planned design, not yet implemented)
+- [Multi-company tenancy](multi-tenancy/README.md): data ownership and authorization, migration strategy, threat model and acceptance criteria for the planned multi-company platform.
 
 ## Quality and delivery
 
