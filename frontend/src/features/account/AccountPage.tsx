@@ -1,3 +1,4 @@
+import { UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Badge } from '../../components/ui/Badge'
 import { Pagination } from '../../components/ui/Pagination'
@@ -15,10 +16,18 @@ export function AccountPage() {
 
   return (
     <div className="container page stack">
-      <h1 className="page-heading">My account</h1>
+      <div className="page-intro">
+        <h1 className="page-heading">My account</h1>
+        <p className="muted">Your details and rental history.</p>
+      </div>
 
       <section className="card card-body" aria-labelledby="profile-title">
-        <h2 id="profile-title">Your details</h2>
+        <div className="profile-header">
+          <span className="avatar">
+            <UserRound size={28} aria-hidden="true" />
+          </span>
+          <h2 id="profile-title">Your details</h2>
+        </div>
         <dl className="detail-list">
           <dt>Email</dt>
           <dd>{user?.email}</dd>
@@ -84,7 +93,7 @@ function Rentals() {
       ) : rentals.isError ? (
         <ErrorState error={rentals.error} onRetry={() => void rentals.refetch()} title="We could not load your rentals" />
       ) : rentals.data.items.length === 0 ? (
-        <p>You have no rentals yet.</p>
+        <p className="muted">You have no rentals yet. When staff hand you a vehicle, the rental will appear here.</p>
       ) : (
         <>
           <ul className="reservation-list" aria-label="Your rentals">
@@ -96,11 +105,11 @@ function Rentals() {
                     From {formatDate(rental.startDate)} to {formatDate(rental.expectedReturnDate)}
                     {rental.actualReturnDate && <> &middot; returned {formatDate(rental.actualReturnDate)}</>}
                   </p>
-                  <p>
+                  <p className="meta-row">
                     <Badge tone={rental.status === 'Active' ? 'info' : 'success'}>
                       {rental.status === 'Active' ? 'Out now' : 'Returned'}
-                    </Badge>{' '}
-                    &nbsp;<strong>{formatMoney(rental.totalCost)}</strong>
+                    </Badge>
+                    <strong>{formatMoney(rental.totalCost)}</strong>
                   </p>
                 </div>
               </li>

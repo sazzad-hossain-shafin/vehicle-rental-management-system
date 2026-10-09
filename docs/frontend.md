@@ -18,24 +18,44 @@ Not built: payments (there is no payment concept in the API), staff or admin scr
 
 ## Running it
 
-**Everything in Docker** (database, migrations, API and website):
+There are two ways to run the website. The pages show real data from the API, so a page that needs vehicles, prices or reservations only works when the API and PostgreSQL are running too. Without them the website still loads and shows a clear "we could not reach the server" message with a **Try again** button; it never shows made-up data.
+
+### 1. Full application (website, API and PostgreSQL) in Docker
 
 ```bash
-bash scripts/init-env.sh          # or scripts/init-env.ps1 on Windows
+bash scripts/init-env.sh          # or scripts/init-env.ps1 on Windows; creates .env with random secrets
 docker compose up --build -d
 ```
 
-The website is at <http://localhost:8081> (set `WEB_PORT` in `.env` to change it). An nginx container serves the built files and forwards `/api/` to the API, so the browser talks to one origin. The API is still published on its own port, and the API-only workflow is unchanged.
+Open <http://localhost:8081> (set `WEB_PORT` in `.env` to change it). Compose starts PostgreSQL, applies the migrations, starts the API and then the website. An nginx container serves the built files and forwards `/api/` to the API, so the browser talks to one origin. The API is also published on `API_PORT` (default 8080); if something else on your machine already uses 8080, set `API_PORT=8090` in `.env`.
 
-**Development with hot reload** (needs Node 24 and a running API, for example `docker compose up -d postgres migrate api`):
+Check it is healthy with `docker compose ps` (every service `healthy`, `migrate` exited). The first vehicles are added by an administrator through the API; sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `.env` (see the README).
+
+### 2. Frontend only, with hot reload
+
+Needs Node 24. From `frontend/`:
 
 ```bash
-cd frontend
 npm ci
-npm run dev                       # http://localhost:5173, forwards /api to the API
+npm start                         # or: npm run dev   (both start Vite on http://localhost:5173)
 ```
 
-The dev server forwards `/api` to `http://localhost:5270` (the API's default development address). Point it elsewhere with `DEV_API_TARGET`, for example `DEV_API_TARGET=http://localhost:8080 npm run dev` when using the Compose API. This variable is read by the dev server only; nothing is bundled into the page. The only browser-side setting is the optional `VITE_API_BASE_PATH` (default `/api/v1`), which is public by nature. There are no secrets in the frontend.
+Both commands open the website in your default browser. The browser is **not** opened in CI, inside a Docker container, or when you opt out:
+
+| To skip opening the browser | |
+|---|---|
+| `npm run dev:no-open` | Starts the same server without opening it |
+| `NO_OPEN=1 npm start` | Same, through the environment (`$env:NO_OPEN=1` in PowerShell) |
+| `CI=true`, or running in a container | Never opens a browser |
+
+The dev server forwards `/api` to an API, which you start yourself:
+
+- **API from Docker Compose:** `docker compose up -d postgres migrate api`, then point the dev server at it: `DEV_API_TARGET=http://localhost:8080 npm start` (use your `API_PORT`). In PowerShell: `$env:DEV_API_TARGET='http://localhost:8080'; npm start`.
+- **API with `dotnet run`:** `dotnet run --project src/VehicleRental.Api` listens on `http://localhost:5270`, which is the dev server's default target, so no setting is needed. It still needs a reachable PostgreSQL and the user secrets described in the README.
+
+If the target is not running you see one line in the terminal, `[api proxy] Cannot reach the API at … (ECONNREFUSED)`, and the pages show the "could not reach the server" message. That is the real failure surfaced, not hidden: start the API or fix `DEV_API_TARGET`.
+
+`DEV_API_TARGET`, `NO_OPEN` and `CI` are read by the dev server only; nothing is bundled into the page. The only browser-side setting is the optional `VITE_API_BASE_PATH` (default `/api/v1`), which is public by nature. There are no secrets in the frontend.
 
 Node 24 (the current LTS line) is pinned in `frontend/.nvmrc`, in `engines`, and in CI. TypeScript is held at 5.9 because the linting and OpenAPI tooling support that range.
 
@@ -46,6 +66,7 @@ Node 24 (the current LTS line) is pinned in `frontend/.nvmrc`, in `engines`, and
 | `npm run typecheck` | Strict TypeScript |
 | `npm run lint` | ESLint, including type-aware rules (no `any`, no floating promises) |
 | `npm test` | Vitest and React Testing Library |
+| `npm start` / `npm run dev` | Vite dev server with hot reload (opens the browser locally); `npm run dev:no-open` does not |
 | `npm run build` | Typecheck and production bundle |
 | `npm run e2e` | Playwright against a running stack (see below) |
 | `npm run api:types` | Regenerate `src/lib/api/schema.d.ts` from the API's OpenAPI document |
@@ -62,7 +83,7 @@ frontend/src/
   features/account/    profile and rentals
   lib/api/             the single HTTP client, error type, endpoint functions, generated schema
   lib/                 date and money helpers
-  styles/              design tokens, base styles, components (plain CSS, no framework)
+  styles/              design tokens, base styles, components (plain CSS, no framework; Inter variable font bundled locally)
   test/                test setup and fake-API helpers
 frontend/e2e/          Playwright tests
 ```
@@ -113,3 +134,25 @@ Use a throwaway database: the tests create accounts, vehicles and reservations a
 ## Not done yet
 
 Deployment (this runs locally in Docker only, over plain HTTP; production needs TLS and the `Session__ForceSecureCookie` setting), password reset and email verification, refresh tokens, staff screens, automated accessibility scanning, and screenshots (see [screenshots](screenshots.md)).
+
+## Design system
+
+Plain CSS with custom properties, no framework. `styles/tokens.css` defines the palette (deep navy surfaces, one blue accent, AA-checked status colours), a 4px spacing scale, a type scale, radii, shadows and motion. Inter (variable) is bundled from `@fontsource-variable/inter`, so no request leaves the site and the Content-Security-Policy stays `font-src 'self'`.
+
+- **Breakpoints:** 40rem, 52rem and 72rem. They are written literally in media queries because CSS custom properties cannot be used in a media condition.
+- **Motion:** 180 ms ease transitions on colour, shadow and a 2 px card lift; all of it is switched off by `prefers-reduced-motion`.
+- **Accessibility:** skip link, a visible focus ring on every control, labelled fields linked to their hints and errors, native `<dialog>` for confirmations, status and alert roles for messages.
+- **Imagery:** the API has no photographs, so vehicle cards show an original icon for the vehicle type. Nothing pretends to be a photo of the vehicle.
+
+## Screenshots
+
+| Before | After |
+|---|---|
+| ![Home before](images/redesign/before-desktop-home.png) | ![Home after](images/redesign/after-desktop-home.png) |
+| ![Mobile home before](images/redesign/before-mobile-home.png) | ![Mobile home after](images/redesign/after-mobile-home.png) |
+| ![Vehicles before](images/redesign/before-desktop-vehicles.png) | ![Vehicles after](images/redesign/after-desktop-vehicles.png) |
+
+The vehicle page, and the page shown when the API cannot be reached:
+
+![Vehicle details](images/redesign/after-desktop-detail.png)
+![API unavailable](images/redesign/after-desktop-offline.png)

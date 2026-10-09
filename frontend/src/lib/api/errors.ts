@@ -30,6 +30,11 @@ export class ApiError extends Error {
     return this.status === 0
   }
 
+  /** The server could not be reached, or a gateway in front of it could not (502, 503, 504). */
+  get isUnavailable(): boolean {
+    return this.status === 0 || this.status === 502 || this.status === 503 || this.status === 504
+  }
+
   get isUnauthorized(): boolean {
     return this.status === 401
   }
@@ -48,7 +53,7 @@ export class ApiError extends Error {
 
   /** A sentence that is safe and useful to show to a person. */
   get userMessage(): string {
-    if (this.isNetworkError) {
+    if (this.isUnavailable) {
       return 'We could not reach the server. Check your connection and try again.'
     }
     if (this.status >= 500) {

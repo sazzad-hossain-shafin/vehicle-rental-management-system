@@ -1,6 +1,5 @@
-import { CalendarCheck, CarFront, KeyRound, Search } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
-import { LinkButton } from '../../components/ui/Button'
+import { ArrowRight, CalendarCheck, CarFront, CircleCheck, KeyRound, Search } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingGrid } from '../../components/ui/States'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { DateRangeForm } from './DateRangeForm'
@@ -14,6 +13,8 @@ const STEPS = [
   { icon: KeyRound, title: 'Collect at the desk', text: 'Our rental desk hands the vehicle over on your pickup day.' },
 ] as const
 
+const PROMISES = ['Exact price before you reserve', 'Cancel any time before pickup day', 'No payment taken online'] as const
+
 export function HomePage() {
   useDocumentTitle('Reserve a vehicle for your dates')
   const navigate = useNavigate()
@@ -23,27 +24,45 @@ export function HomePage() {
     <>
       <section className="hero" aria-labelledby="hero-title">
         <div className="container">
+          <span className="eyebrow">Cars, motorcycles and vans</span>
           <h1 id="hero-title">Reserve the right vehicle for your dates</h1>
           <p className="lead">
-            Check which cars, motorcycles and vans are free, see the exact price for your trip, and reserve in a few
-            clicks.
+            Check which vehicles are free, see the exact price for your trip, and reserve in a few clicks.
           </p>
-          <div className="search-panel">
-            <DateRangeForm
-              idPrefix="home"
-              submitLabel="Find vehicles"
-              onSubmit={({ startDate, endDate }) => navigate(`/vehicles?start=${startDate}&end=${endDate}`)}
-            />
-          </div>
+          <ul className="trust-list">
+            {PROMISES.map((promise) => (
+              <li key={promise}>
+                <CircleCheck size={16} aria-hidden="true" /> {promise}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <section className="container page" aria-labelledby="how-title">
-        <h2 id="how-title">How it works</h2>
+      <div className="container search-overlap">
+        <div className="search-panel">
+          <DateRangeForm
+            wide
+            idPrefix="home"
+            submitLabel="Find vehicles"
+            onSubmit={({ startDate, endDate }) => navigate(`/vehicles?start=${startDate}&end=${endDate}`)}
+          />
+        </div>
+      </div>
+
+      <section className="container section" aria-labelledby="how-title">
+        <div className="section-head">
+          <div>
+            <h2 id="how-title">How it works</h2>
+            <p className="muted">From search to keys in four steps.</p>
+          </div>
+        </div>
         <ol className="steps">
           {STEPS.map(({ icon: Icon, title, text }) => (
             <li key={title}>
-              <Icon size={22} aria-hidden="true" />
+              <span className="step-icon">
+                <Icon size={24} aria-hidden="true" />
+              </span>
               <h3>{title}</h3>
               <p className="muted">{text}</p>
             </li>
@@ -51,8 +70,16 @@ export function HomePage() {
         </ol>
       </section>
 
-      <section className="container page" aria-labelledby="fleet-title">
-        <h2 id="fleet-title">From the fleet</h2>
+      <section className="container section fleet-section" aria-labelledby="fleet-title">
+        <div className="section-head">
+          <div>
+            <h2 id="fleet-title">From the fleet</h2>
+            <p className="muted">A few of the vehicles you can reserve.</p>
+          </div>
+          <Link className="more-link" to="/vehicles">
+            Browse all vehicles <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </div>
         {fleet.isPending ? (
           <LoadingGrid count={3} label="Loading vehicles" />
         ) : fleet.isError ? (
@@ -60,20 +87,13 @@ export function HomePage() {
         ) : fleet.data.items.length === 0 ? (
           <p className="muted">There are no vehicles to show yet.</p>
         ) : (
-          <>
-            <ul className="vehicle-grid">
-              {fleet.data.items.map((vehicle) => (
-                <li key={vehicle.id}>
-                  <VehicleCard vehicle={vehicle} />
-                </li>
-              ))}
-            </ul>
-            <p>
-              <LinkButton to="/vehicles" variant="secondary">
-                Browse all vehicles
-              </LinkButton>
-            </p>
-          </>
+          <ul className="vehicle-grid">
+            {fleet.data.items.map((vehicle) => (
+              <li key={vehicle.id}>
+                <VehicleCard vehicle={vehicle} />
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </>

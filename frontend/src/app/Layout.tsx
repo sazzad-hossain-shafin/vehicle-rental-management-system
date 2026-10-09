@@ -92,7 +92,7 @@ export function Layout() {
                       </NavLink>
                     </li>
                     <li>
-                      <NavLink className="nav-link" to="/register">
+                      <NavLink className="nav-link nav-cta" to="/register">
                         Create account
                       </NavLink>
                     </li>
@@ -119,8 +119,11 @@ export function Layout() {
       <footer className="site-footer">
         <div className="container footer-grid">
           <div>
-            <p>
-              <strong>Vehicle Rental</strong>
+            <p className="footer-brand">
+              <span className="brand-mark" aria-hidden="true">
+                <CarFront size={20} />
+              </span>
+              Vehicle Rental
             </p>
             <p>
               A portfolio demonstration of a vehicle rental system. It is not a real rental business, and no payment is
@@ -128,6 +131,7 @@ export function Layout() {
             </p>
           </div>
           <nav aria-label="Footer">
+            <h2 className="footer-heading">Explore</h2>
             <ul className="footer-list">
               <li>
                 <Link to="/vehicles">Browse vehicles</Link>
@@ -135,6 +139,11 @@ export function Layout() {
               <li>
                 <Link to="/reservations">My reservations</Link>
               </li>
+              {status === 'authenticated' && (
+                <li>
+                  <Link to="/account">My account</Link>
+                </li>
+              )}
             </ul>
           </nav>
         </div>

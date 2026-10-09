@@ -30,7 +30,7 @@ export function LoadingBlock({ label = 'Loading' }: { label?: string }) {
       <div aria-hidden="true">
         <div className="skeleton skeleton-line" />
         <div className="skeleton skeleton-line" />
-        <div className="skeleton skeleton-line" />
+        <div className="skeleton skeleton-line" style={{ width: '60%' }} />
       </div>
     </div>
   )
@@ -46,7 +46,7 @@ interface EmptyStateProps {
 export function EmptyState({ icon, title, children, action }: EmptyStateProps) {
   return (
     <div className="empty-state">
-      {icon}
+      {icon && <span className="state-icon">{icon}</span>}
       <h2>{title}</h2>
       {children && <p className="muted">{children}</p>}
       {action}
@@ -58,10 +58,12 @@ export function EmptyState({ icon, title, children, action }: EmptyStateProps) {
 export function ErrorState({ error, onRetry, title = 'Something went wrong' }: { error: unknown; onRetry?: () => void; title?: string }) {
   const message =
     error instanceof ApiError ? error.userMessage : 'An unexpected problem occurred. Please try again.'
+  // The booking service itself could not be reached: say so plainly instead of implying the request was wrong.
+  const unavailable = error instanceof ApiError && error.isUnavailable
 
   return (
     <Alert
-      tone="error"
+      tone={unavailable ? 'warning' : 'error'}
       title={title}
       actions={
         onRetry && (
@@ -72,6 +74,7 @@ export function ErrorState({ error, onRetry, title = 'Something went wrong' }: {
       }
     >
       <p>{message}</p>
+      {unavailable && <p>The booking service may be starting up or briefly offline. Nothing you entered has been lost.</p>}
       {error instanceof ApiError && error.traceId && (
         <p className="hint">Reference: {error.traceId}</p>
       )}

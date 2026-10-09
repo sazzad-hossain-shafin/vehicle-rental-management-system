@@ -65,10 +65,16 @@ export function VehiclesPage() {
 
   return (
     <div className="container page">
-      <h1 className="page-heading">{range ? 'Vehicles free for your dates' : 'Our vehicles'}</h1>
+      <div className="page-intro">
+        <h1 className="page-heading">{range ? 'Vehicles free for your dates' : 'Our vehicles'}</h1>
+        <p className="muted">
+          {range ? 'Every vehicle below is free for the dates you chose.' : 'Add your dates to see only the vehicles that are free.'}
+        </p>
+      </div>
 
       <section className="card card-body" aria-label="Search by dates">
         <DateRangeForm
+          wide
           key={`${start}|${end}`}
           idPrefix="vehicles"
           initial={{ startDate: start, endDate: end }}
@@ -88,7 +94,7 @@ export function VehiclesPage() {
         )}
       </section>
 
-      <form className="toolbar" onSubmit={applyFilters} aria-label="Filter vehicles" noValidate>
+      <form className="card toolbar" onSubmit={applyFilters} aria-label="Filter vehicles" noValidate>
         <SelectField
           label="Vehicle type"
           value={typeDraft}
@@ -137,7 +143,7 @@ export function VehiclesPage() {
           </EmptyState>
         ) : data ? (
           <>
-            <p className="muted">{pluralize(data.totalCount, 'vehicle')} found</p>
+            <p className="result-count muted">{pluralize(data.totalCount, 'vehicle')} found</p>
             <ul className="vehicle-grid">
               {data.items.map((vehicle) => (
                 <li key={vehicle.id}>

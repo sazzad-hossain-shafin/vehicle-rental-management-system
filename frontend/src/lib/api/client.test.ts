@@ -71,6 +71,17 @@ describe('api client', () => {
     expect(failure.userMessage).toMatch(/our side/)
   })
 
+  it('treats a network failure and a gateway failure as an unavailable service', () => {
+    for (const status of [0, 502, 503, 504]) {
+      const error = new ApiError({ status, title: 'x', detail: 'internal detail' })
+      expect(error.isUnavailable).toBe(true)
+      expect(error.userMessage).toMatch(/could not reach the server/i)
+      expect(error.userMessage).not.toContain('internal detail')
+    }
+    expect(new ApiError({ status: 500, title: 'x' }).isUnavailable).toBe(false)
+    expect(new ApiError({ status: 404, title: 'x' }).isUnavailable).toBe(false)
+  })
+
   it('copes with an error body that is not JSON (for example a proxy page)', async () => {
     const response = new Response('<html>Bad gateway</html>', { status: 502, statusText: 'Bad Gateway' })
 

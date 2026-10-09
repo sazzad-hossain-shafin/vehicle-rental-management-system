@@ -1,37 +1,56 @@
-/* Design tokens. Colour pairs below were chosen for at least WCAG AA contrast (4.5:1 for text). */
+/*
+ * Design tokens. Colour pairs were chosen for at least WCAG AA contrast (4.5:1 for text, 3:1 for UI parts).
+ *
+ * Breakpoints (CSS custom properties cannot be used inside media queries, so the values are written out where
+ * they are needed; keep them to these three):
+ *   40rem  (640px)   phone to tablet
+ *   52rem  (832px)   tablet to desktop (header switches to a row, grids widen)
+ *   72rem  (1152px)  wide desktop
+ */
 :root {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  --color-bg: #f5f6f8;
+  /* Surfaces and text */
+  --color-bg: #f5f7fb;
   --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
   --color-ink: #0f172a;
   --color-ink-muted: #475569;
-  --color-line: #dbe1ea;
+  --color-line: #e2e8f0;
   --color-line-strong: #94a3b8;
 
+  /* Dark surfaces (header, hero, footer) */
   --color-dark: #0b1220;
-  --color-dark-2: #172033;
+  --color-dark-2: #111c33;
   --color-on-dark: #f8fafc;
-  --color-on-dark-muted: #cbd5e1;
+  --color-on-dark-muted: #b6c2d4;
+  --color-dark-line: rgb(255 255 255 / 0.12);
 
+  /* Brand */
   --color-brand: #1d4ed8;
-  --color-brand-strong: #1e3a8a;
-  --color-brand-soft: #e8efff;
+  --color-brand-strong: #1e40af;
+  --color-brand-soft: #eaf0ff;
+  --color-brand-bright: #60a5fa;
   --color-on-brand: #ffffff;
 
+  /* Status */
   --color-success: #166534;
   --color-success-bg: #dcfce7;
   --color-warning: #8a3b0c;
   --color-warning-bg: #fef3c7;
   --color-danger: #b91c1c;
+  --color-danger-strong: #991b1b;
   --color-danger-bg: #fee2e2;
   --color-info: #1e40af;
   --color-info-bg: #dbeafe;
 
-  --radius-sm: 6px;
+  /* Radius */
+  --radius-sm: 8px;
   --radius: 12px;
   --radius-lg: 20px;
+  --radius-pill: 999px;
 
+  /* Spacing (4px base) */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -39,11 +58,28 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
   --space-7: 3rem;
-  --space-8: 4.5rem;
+  --space-8: 4rem;
+  --space-9: 5rem;
 
-  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 1px 3px rgb(15 23 42 / 0.08);
-  --shadow-md: 0 4px 16px rgb(15 23 42 / 0.1);
+  /* Type scale */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-display: 3.25rem;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 6px 20px rgb(15 23 42 / 0.08);
+  --shadow-lg: 0 18px 48px rgb(15 23 42 / 0.16);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --duration: 180ms;
 
   --content-width: 72rem;
-  --focus-ring: 0 0 0 3px #ffffff, 0 0 0 6px #1d4ed8;
+  --header-height: 4rem;
+  --focus-ring: 0 0 0 3px #ffffff, 0 0 0 5px #1d4ed8;
 }

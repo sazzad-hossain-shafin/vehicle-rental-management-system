@@ -14,11 +14,18 @@ export function VehicleCard({ vehicle, dates }: VehicleCardProps) {
   const search = dates ? `?start=${dates.startDate}&end=${dates.endDate}` : ''
 
   return (
-    <article className="card vehicle-card" aria-labelledby={`vehicle-${vehicle.id}`}>
-      <VehicleArt type={vehicle.vehicleType} />
+    <article className="card card-lift vehicle-card" aria-labelledby={`vehicle-${vehicle.id}`}>
+      <div className="art-frame">
+        <VehicleArt type={vehicle.vehicleType} />
+        <span className="vehicle-art-label">{vehicle.vehicleType}</span>
+      </div>
       <div className="vehicle-card-body">
-        <div>
-          <Badge tone="neutral">{vehicle.vehicleType}</Badge>{' '}
+        <h3 id={`vehicle-${vehicle.id}`}>{vehicle.displayName}</h3>
+        <p className="muted">{vehicle.year}</p>
+        <div className="vehicle-meta">
+          <p className="price">
+            {formatMoney(vehicle.dailyRate)} <small>per day</small>
+          </p>
           {dates ? (
             <Badge tone="success">Free for your dates</Badge>
           ) : vehicle.availabilityStatus === 'Available' ? (
@@ -27,11 +34,6 @@ export function VehicleCard({ vehicle, dates }: VehicleCardProps) {
             <Badge tone="warning">Out right now</Badge>
           )}
         </div>
-        <h3 id={`vehicle-${vehicle.id}`}>{vehicle.displayName}</h3>
-        <p className="muted">{vehicle.year}</p>
-        <p className="price">
-          {formatMoney(vehicle.dailyRate)} <small>per day</small>
-        </p>
         <div className="card-actions">
           <Link
             className="btn btn-secondary btn-block"
