@@ -113,6 +113,15 @@ docker compose stop               # stop, keeping containers and data
 docker compose down               # stop and remove containers. YOUR DATA IS KEPT (named volume)
 ```
 
+### Backing up, and rehearsing a migration on a copy
+
+```bash
+bash scripts/db-backup.sh                       # a backup of the live database (read only), into backups/ (not committed)
+bash scripts/db-rehearse-migration.sh --yes     # restore to a scratch copy, migrate it, compare, roll back, compare
+```
+
+The scripts only ever read the live database and only change scratch databases named `vr_rehearsal_...`. See [Backup, restore and migration rehearsal](multi-tenancy/backup-restore-rehearsal.md).
+
 ### Resetting the local database
 
 ```bash

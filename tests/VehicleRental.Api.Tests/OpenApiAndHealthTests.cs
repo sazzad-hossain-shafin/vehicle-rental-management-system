@@ -21,6 +21,17 @@ public class OpenApiAndHealthTests
     }
 
     [Fact]
+    public async Task OpenApiDocument_DoesNotExposeAnyCompanyConceptYet()
+    {
+        // Phase 14A-3 adds company tables and columns to the database only. Until authorization and Row-Level Security
+        // exist, nothing about them may appear in the public API contract.
+        var document = await GetOpenApiDocumentAsync();
+
+        Assert.DoesNotContain("company", document.GetRawText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("tenant", document.GetRawText(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task OpenApiDocument_ListsEveryIntendedRouteWithTheRightMethod()
     {
         var document = await GetOpenApiDocumentAsync();

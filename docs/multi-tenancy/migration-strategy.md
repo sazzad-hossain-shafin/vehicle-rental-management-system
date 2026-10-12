@@ -14,10 +14,11 @@ Planned design; see [ADR 007](../architecture/007-multi-company-tenancy.md). Not
 
 ### 1. Expand (additive only)
 
-- Create `Companies`, `CompanyMemberships`, `CompanyCustomers`, `CompanyInvitations` and an audit table.
+- Create `Companies`, `CompanyMemberships` and `CompanyCustomers`. (`CompanyInvitations` and the audit table are deferred to 14B, where they are first used.)
 - Add a **nullable** `CompanyId` to `Vehicles`, `Reservations` and `Rentals`.
 - Add a unique key `(CompanyId, Id)` on `Vehicles` and on the company-customer link, as targets for the composite foreign keys.
 - Application code does not use any of it yet.
+- Implemented as the migration `AddCompanyTenancyExpand` (14A-3). What it contains, the review of each index and foreign key, the write gap it leaves, and the safe repeatable backfill and cutover strategy are in [expand-and-cutover.md](expand-and-cutover.md); the rehearsal scripts are in [backup-restore-rehearsal.md](backup-restore-rehearsal.md).
 
 ### 2. Backfill (one transaction, repeatable check)
 

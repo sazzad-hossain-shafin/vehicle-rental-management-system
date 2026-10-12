@@ -174,6 +174,10 @@ public sealed class UnitOfWork : IUnitOfWork, IAsyncDisposable
         ReservationConfiguration.RentalIndex => "The reservation has already been picked up.",
         "IX_Vehicles_RegistrationNumber" => "A vehicle with that registration number already exists.",
         "IX_Customers_CustomerNumber" => "A customer with that customer number already exists.",
+        CompanyConfiguration.SlugIndex => "A company with that web address already exists.",
+        CompanyMembershipConfiguration.OneRowPerUserIndex => "That user already has a membership in this company.",
+        CompanyCustomerConfiguration.NumberIndex => "A customer with that customer number already exists in this company.",
+        CompanyCustomerConfiguration.PersonIndex => "That customer is already linked to this company.",
         _ => "The change conflicts with existing data."
     };
 }

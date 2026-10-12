@@ -111,12 +111,10 @@ public class ModelConfigurationTests
         using var context = CreateContext();
         var foreignKeys = EntityType<Rental>(context).GetForeignKeys().ToList();
 
-        Assert.Equal(2, foreignKeys.Count);
-        Assert.All(foreignKeys, fk =>
-        {
-            Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior);
-            Assert.True(fk.IsRequired);
-        });
+        // Customer and vehicle (required), plus the optional tenant column added in Phase 14A-3 (nullable until backfilled).
+        Assert.Equal(3, foreignKeys.Count);
+        Assert.All(foreignKeys, fk => Assert.Equal(DeleteBehavior.Restrict, fk.DeleteBehavior));
+        Assert.Equal(2, foreignKeys.Count(fk => fk.IsRequired));
     }
 
     [Fact]
