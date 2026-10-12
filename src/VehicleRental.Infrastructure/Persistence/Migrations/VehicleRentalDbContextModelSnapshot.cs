@@ -175,6 +175,154 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
                     b.ToTable("UserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("VehicleRental.Domain.Entities.Company", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(63)
+                        .HasColumnType("character varying(63)")
+                        .UseCollation("C");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Companies_Slug");
+
+                    b.ToTable("Companies", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Companies_ActiveIsApproved", "\"Status\" <> 'Active' OR \"ApprovedAt\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_Companies_Name_NotBlank", "char_length(btrim(\"Name\")) > 0");
+
+                            t.HasCheckConstraint("CK_Companies_PendingIsNotApproved", "\"Status\" <> 'PendingReview' OR \"ApprovedAt\" IS NULL");
+
+                            t.HasCheckConstraint("CK_Companies_Slug_Format", "\"Slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$' AND char_length(\"Slug\") BETWEEN 3 AND 63");
+
+                            t.HasCheckConstraint("CK_Companies_Status_Known", "\"Status\" IN ('PendingReview', 'Active', 'Suspended')");
+
+                            t.HasCheckConstraint("CK_Companies_TimeZoneId_NotBlank", "char_length(btrim(\"TimeZoneId\")) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("VehicleRental.Domain.Entities.CompanyCustomer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .UseCollation("C");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("IX_CompanyCustomers_CustomerId");
+
+                    b.HasIndex("CompanyId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyCustomers_CompanyId_CustomerId");
+
+                    b.HasIndex("CompanyId", "CustomerNumber")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyCustomers_CompanyId_CustomerNumber");
+
+                    b.HasIndex("CompanyId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyCustomers_CompanyId_Id");
+
+                    b.ToTable("CompanyCustomers", (string)null);
+                });
+
+            modelBuilder.Entity("VehicleRental.Domain.Entities.CompanyMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("IX_CompanyMemberships_ActiveOwners")
+                        .HasFilter("\"Role\" = 'Owner' AND \"Status\" = 'Active'");
+
+                    b.HasIndex("CompanyId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_CompanyMemberships_CompanyId_UserId");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("IX_CompanyMemberships_UserId_Status");
+
+                    b.ToTable("CompanyMemberships", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CompanyMemberships_Role_Known", "\"Role\" IN ('Owner', 'Staff')");
+
+                            t.HasCheckConstraint("CK_CompanyMemberships_Status_Known", "\"Status\" IN ('Active', 'Removed')");
+                        });
+                });
+
             modelBuilder.Entity("VehicleRental.Domain.Entities.Customer", b =>
                 {
                     b.Property<Guid>("Id")
@@ -209,6 +357,12 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("BillableDays")
                         .HasColumnType("integer");
+
+                    b.Property<Guid?>("CompanyCustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
@@ -279,6 +433,12 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("CancelledAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CompanyCustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -362,6 +522,9 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<Guid?>("CompanyId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("DailyRate")
                         .HasPrecision(10, 2)
                         .HasColumnType("numeric(10,2)");
@@ -402,6 +565,10 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.HasIndex("AvailabilityStatus", "VehicleType");
+
+                    b.HasIndex("CompanyId", "Id")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Vehicles_CompanyId_Id");
 
                     b.ToTable("Vehicles", null, t =>
                         {
@@ -533,8 +700,49 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("VehicleRental.Domain.Entities.CompanyCustomer", b =>
+                {
+                    b.HasOne("VehicleRental.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VehicleRental.Domain.Entities.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VehicleRental.Domain.Entities.CompanyMembership", b =>
+                {
+                    b.HasOne("VehicleRental.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VehicleRental.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VehicleRental.Infrastructure.Identity.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VehicleRental.Domain.Entities.Rental", b =>
                 {
+                    b.HasOne("VehicleRental.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Rentals_Companies_CompanyId");
+
                     b.HasOne("VehicleRental.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -554,6 +762,12 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("VehicleRental.Domain.Entities.Reservation", b =>
                 {
+                    b.HasOne("VehicleRental.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Reservations_Companies_CompanyId");
+
                     b.HasOne("VehicleRental.Domain.Entities.Customer", "Customer")
                         .WithMany()
                         .HasForeignKey("CustomerId")
@@ -574,6 +788,15 @@ namespace VehicleRental.Infrastructure.Persistence.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("Vehicle");
+                });
+
+            modelBuilder.Entity("VehicleRental.Domain.Entities.Vehicle", b =>
+                {
+                    b.HasOne("VehicleRental.Domain.Entities.Company", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("FK_Vehicles_Companies_CompanyId");
                 });
 
             modelBuilder.Entity("VehicleRental.Infrastructure.Identity.ApplicationUser", b =>

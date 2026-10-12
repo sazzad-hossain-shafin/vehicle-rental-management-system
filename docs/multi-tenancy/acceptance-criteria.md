@@ -29,6 +29,19 @@ The proof of concept lives in its own test project, uses its own throwaway table
 - [x] Results, the design chosen, and any limitation are documented. If RLS cannot be made safe in this code base, the work stops with a written recommendation for a safer design.
 - [x] Existing tests are unchanged and green.
 
+## PR 14A-3: schema expand
+
+- [ ] One generated migration, `AddCompanyTenancyExpand`, creates `Companies`, `CompanyMemberships` and `CompanyCustomers` and adds nullable `CompanyId` (and `CompanyCustomerId` on reservations and rentals); it contains no statement that changes an existing row.
+- [ ] The new columns on existing tables are EF shadow properties: no domain class, DTO, endpoint or OpenAPI change.
+- [ ] Every existing test passes unchanged, apart from the one assertion that counts a rental's foreign keys (it now expects the new optional company key).
+- [ ] A test seeds data in every existing table, applies the migration, and shows identical counts, old-column data and `xmin` row versions.
+- [ ] Up, Down and Up again work on a disposable database; Down restores the exact previous schema and data; Down refuses once any tenant data exists.
+- [ ] The migration gives up after its lock timeout instead of waiting behind a long transaction, and leaves nothing half applied.
+- [ ] Tests cover slug validation (domain and database), reserved names, collisions, membership uniqueness and history, per-company customer numbers, customer links, foreign keys, status constraints and the reviewed index list.
+- [ ] The vehicle row lock, the no-overlap exclusion constraint and the one-active-rental index are unchanged.
+- [ ] A backup, restore and migration rehearsal on a copy of the development data passes, the live development database is not migrated, and the result is recorded.
+- [ ] The write gap and the backfill and cutover strategy are documented. No backfill, tenant resolution, RLS, runtime role, authorization, registration, invitation or frontend change is included.
+
 ## Later steps (for reference, each needs approval)
 
 **Schema expand and backfill**

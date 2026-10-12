@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using VehicleRental.Domain.Entities;
 using VehicleRental.Infrastructure.Identity;
 
@@ -26,6 +29,22 @@ public class VehicleRentalDbContext : IdentityDbContext<ApplicationUser, Identit
     public DbSet<Rental> Rentals => Set<Rental>();
 
     public DbSet<Reservation> Reservations => Set<Reservation>();
+
+    // Phase 14A-3 (expand): present in the schema, used by nothing in the running application yet.
+    public DbSet<Company> Companies => Set<Company>();
+
+    public DbSet<CompanyMembership> CompanyMemberships => Set<CompanyMembership>();
+
+    public DbSet<CompanyCustomer> CompanyCustomers => Set<CompanyCustomer>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+
+        configurationBuilder.Conventions.Replace<ForeignKeyIndexConvention>(
+            serviceProvider => new NoUnneededForeignKeyIndexesConvention(
+                serviceProvider.GetRequiredService<ProviderConventionSetBuilderDependencies>()));
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

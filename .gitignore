@@ -223,3 +223,6 @@ test-results/
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+
+# Database backups hold real data (accounts, bookings) and must never be committed.
+backups/
