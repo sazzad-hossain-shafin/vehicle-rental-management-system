@@ -12,5 +12,5 @@ Status of the work:
 | Step | State |
 |---|---|
 | Architecture decision (ADR 007) | recorded |
-| RLS and connection-pooling proof of concept | next pull request |
-| Everything else | not started, each step needs approval |
+| RLS and connection-pooling proof of concept | done, successful: [results](../../tests/VehicleRental.TenantIsolation.Spike/README.md) |
+| Schema expand (14A-3) and everything after | not started, each step needs approval |

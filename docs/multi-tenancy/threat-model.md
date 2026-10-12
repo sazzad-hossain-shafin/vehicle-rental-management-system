@@ -37,6 +37,8 @@ Planned design; see [ADR 007](../architecture/007-multi-company-tenancy.md). Eac
 
 ## Residual risks accepted for now
 
+- RLS keyed on a setting does not stop an attacker who can already run arbitrary SQL as the application role (that role can set the same setting). See the [spike results](../../tests/VehicleRental.TenantIsolation.Spike/README.md) and [ADR 007](../architecture/007-multi-company-tenancy.md#spike-outcome-and-production-requirements).
+- PgBouncer transaction pooling is not verified; do not assume it is supported.
 - No email confirmation exists, so invitation acceptance relies on the email-match rule and token secrecy.
 - A platform operator with database credentials can read everything; this is an operational risk handled by access control and backups, not by the application.
 - Tokens are stateless for 30 minutes; user disablement is not instant. Membership changes are instant because membership is not in the token.
