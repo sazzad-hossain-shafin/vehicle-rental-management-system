@@ -16,6 +16,8 @@ Run them from the repository root with Bash (Git Bash works on Windows). The Com
 - The live database (`POSTGRES_DB`, default `vehiclerental`) is only ever read. Creating, restoring into, migrating and dropping happen only in a scratch database named `vr_rehearsal_YYYYMMDD_HHMMSS`; any other name is refused, and so is the live database.
 - Dropping asks for confirmation. Without a terminal, or without `--yes`, the scratch database is kept and the drop command is printed.
 - `docker compose down -v` is never used. Nothing here deletes the Compose volume.
+- The migration bundle is pointed at the scratch database twice (the service's environment value and the bundle's own `--connection` option), and the live migration history is compared before and after, so a mistake in one mechanism cannot reach the live database unnoticed.
+- A failed or interrupted backup removes its partial file; database names passed to the scripts are validated.
 - Backups hold real data (accounts, bookings). `backups/` is ignored by Git. Do not commit, upload or share a dump; treat it like the database.
 
 ## The usual run

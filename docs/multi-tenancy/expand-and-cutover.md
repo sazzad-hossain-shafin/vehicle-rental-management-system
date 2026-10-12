@@ -25,7 +25,7 @@ Each was kept only if it is useful now and cheap to add:
 | Item | Decision | Reason |
 |---|---|---|
 | Foreign key `CompanyId` to `Companies` on the three existing tables | **kept** | Every value is NULL now, so validation is a trivial scan. It catches a wrong company ID during the backfill instead of leaving it for the contract step. |
-| Index on `Reservations.CompanyId`, `Rentals.CompanyId` | **not created** | EF Core adds one for every foreign key by default. The column is always NULL and nothing queries by it, so it would only slow inserts. A customised convention skips it; the contract step adds the indexes its queries need. |
+| Index on `Reservations.CompanyId`, `Rentals.CompanyId` | **not created** | EF Core adds one for every foreign key by default. The column is always NULL and nothing queries by it, so it would only slow inserts. A customised convention skips exactly this key (an explicit allow-list of three keys, never a pattern); a test fails if the convention ever suppresses the index of any other foreign key in the model. The contract step adds the indexes its queries need. |
 | Index on `CompanyMemberships.CreatedByUserId` | **not created** | Nothing looks members up by who added them. |
 | `Vehicles (CompanyId, Id)` unique | **kept** | `Id` is already unique, so it can never reject an existing row; with `CompanyId` NULL it constrains nothing. It also serves as the foreign key's index. |
 | `CompanyMemberships (CompanyId, UserId)` unique, `(UserId, Status)`, partial index on active owners | **kept** | The new tables are empty and each index matches a query management requests will make. |

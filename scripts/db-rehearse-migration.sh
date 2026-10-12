@@ -50,11 +50,16 @@ fingerprint() { bash "$ROOT/scripts/db-fingerprint.sh" "$@"; }
 
 run_bundle() {
   # The bundle is the migrate image's entrypoint; arguments after the service name are passed to it (a target migration).
-  # The scratch connection string replaces the live one for this single run. The password never appears in the output.
+  # The scratch connection string replaces the live one for this single run, TWICE on purpose: as the environment value the
+  # service reads and as the bundle's own --connection option, so even a mistake in the environment override could not
+  # send the bundle to the live database. The password never appears in this script's output.
+  local connection="Host=postgres;Port=5432;Database=${scratch};Username=${PG_USER};Password=${password};GSS Encryption Mode=Disable"
   compose run --rm --no-deps \
-    -e "ConnectionStrings__VehicleRentalDatabase=Host=postgres;Port=5432;Database=${scratch};Username=${PG_USER};Password=${password};GSS Encryption Mode=Disable" \
-    migrate "$@"
+    -e "ConnectionStrings__VehicleRentalDatabase=${connection}" \
+    migrate "$@" --connection "${connection}"
 }
+
+live_history_count() { psql_db "$LIVE_DB" -c "SELECT count(*) FROM \"__EFMigrationsHistory\""; }
 
 echo "== Target =="
 echo "live database (read only): $LIVE_DB"
@@ -98,10 +103,16 @@ echo
 before_x="$(fingerprint "$scratch" --xmin)"
 
 echo "== 5. Apply the migrations to the scratch database =="
+live_history_before="$(live_history_count)"
 started=$SECONDS
 run_bundle
 echo "migration took $((SECONDS - started)) s"
 pass "migrations applied to $scratch"
+# An immediate safety check, not only the final one: the live migration history must not have grown.
+if [[ "$(live_history_count)" != "$live_history_before" ]]; then
+  fail "the LIVE database's migration history changed. Stop and investigate before doing anything else."
+  exit 1
+fi
 echo
 
 echo "== 6. Existing data unchanged, new structures present and empty =="

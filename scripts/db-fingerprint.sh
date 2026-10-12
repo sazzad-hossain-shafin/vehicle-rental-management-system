@@ -21,6 +21,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+[[ "$db" =~ ^[A-Za-z0-9_]+$ ]] || die "'$db' is not a valid database name."
 require_stack
 database_exists "$db" || die "database '$db' does not exist."
 

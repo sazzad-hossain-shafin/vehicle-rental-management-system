@@ -23,6 +23,8 @@ timestamp="$(date +%Y%m%d_%H%M%S)"
 file="$out_dir/${LIVE_DB}-${timestamp}.dump"
 
 echo "Database to back up (read only): $LIVE_DB"
+# A failed or interrupted dump must not leave a partial file that looks like a backup.
+trap 'rm -f "$file"' ERR INT TERM
 ( umask 077; compose exec -T postgres pg_dump -U "$PG_USER" -d "$LIVE_DB" --format=custom --no-owner > "$file" )
 
 [[ -s "$file" ]] || { rm -f "$file"; die "the backup is empty; nothing was written."; }
@@ -37,6 +39,7 @@ else
   hash="(sha256sum not available)"
 fi
 
+trap - ERR INT TERM
 echo "Backup written: $file"
 echo "  size:    $(wc -c < "$file") bytes"
 echo "  entries: $entries"

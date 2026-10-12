@@ -94,6 +94,39 @@ public class TenancyModelTests
     }
 
     [Fact]
+    public void The_customised_convention_suppresses_nothing_beyond_its_three_named_keys()
+    {
+        // Guards the allow-list in NoUnneededForeignKeyIndexesConvention against ever widening by accident (for example
+        // after an EF Core upgrade or a future relationship): every other foreign key in the model, Identity's included,
+        // must still be covered by an index or key that starts with its columns.
+        using var context = CreateContext();
+        var intentionallyUncovered = new HashSet<(Type, string)>
+        {
+            (typeof(Reservation), "CompanyId"),
+            (typeof(Rental), "CompanyId"),
+            (typeof(CompanyMembership), nameof(CompanyMembership.CreatedByUserId)),
+        };
+
+        foreach (IEntityType entity in context.Model.GetEntityTypes())
+        {
+            foreach (IForeignKey foreignKey in entity.GetForeignKeys())
+            {
+                int width = foreignKey.Properties.Count;
+                bool covered =
+                    entity.GetIndexes().Any(i => i.Properties.Take(width).SequenceEqual(foreignKey.Properties))
+                    || entity.GetKeys().Any(k => k.Properties.Take(width).SequenceEqual(foreignKey.Properties));
+                bool allowed = width == 1 && intentionallyUncovered.Contains((entity.ClrType, foreignKey.Properties[0].Name));
+
+                Assert.True(
+                    covered != allowed,
+                    allowed
+                        ? $"{entity.DisplayName()}.{foreignKey.Properties[0].Name} should have no index but has one."
+                        : $"{entity.DisplayName()} foreign key ({string.Join(", ", foreignKey.Properties.Select(p => p.Name))}) lost its index.");
+            }
+        }
+    }
+
+    [Fact]
     public void Other_foreign_keys_keep_their_convention_index()
     {
         using var context = CreateContext();
