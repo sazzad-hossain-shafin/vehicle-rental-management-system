@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Accounts;
+using VehicleRental.Application.Tenancy;
+using VehicleRental.Infrastructure.Tenancy;
 using VehicleRental.Infrastructure.Identity;
 using VehicleRental.Infrastructure.Persistence;
 
@@ -42,7 +44,15 @@ public static class DependencyInjection
             }
 
             options.UseNpgsql(connectionString);
+
+            // Both are stateless and act only on a context that has a bound tenant (none does today), so they change
+            // nothing for any existing code path. They read the tenant from the context they intercept.
+            options.AddInterceptors(
+                serviceProvider.GetRequiredService<TenantTransactionInterceptor>(),
+                serviceProvider.GetRequiredService<TenantCommandGuard>());
         });
+
+        AddTenancy(services);
 
         services.AddScoped<IVehicleRepository, VehicleRepository>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
@@ -55,6 +65,29 @@ public static class DependencyInjection
         AddIdentity(services);
 
         return services;
+    }
+
+    /// <summary>
+    /// Phase 14A-4: the tenant infrastructure. Nothing here is used by a production route, no tenant is ever bound by
+    /// existing code, and Tenancy:Enabled is false by default, so registering it changes no behaviour.
+    /// </summary>
+    private static void AddTenancy(IServiceCollection services)
+    {
+        services.AddOptions<TenancyOptions>().BindConfiguration(TenancyOptions.SectionName);
+
+        services.AddSingleton<TenantTransactionInterceptor>();
+        services.AddSingleton<TenantCommandGuard>();
+        services.AddSingleton<ITenantScopeRunner, TenantScopeRunner>();
+
+        // One TenantContext per scope, seen through its read-only and its binding interface.
+        services.AddScoped<TenantContext>();
+        services.AddScoped<ITenantContext>(sp => sp.GetRequiredService<TenantContext>());
+        services.AddScoped<ITenantBinder>(sp => sp.GetRequiredService<TenantContext>());
+        services.AddScoped<ITenantTransaction, TenantTransaction>();
+
+        services.AddScoped<ICompanyDirectory, CompanyDirectory>();
+        services.AddScoped<IMembershipDirectory, MembershipDirectory>();
+        services.AddScoped<DatabaseRoleSafetyCheck>();
     }
 
     private static void AddIdentity(IServiceCollection services)

@@ -15,7 +15,13 @@ public sealed class PostgresFixture : IAsyncLifetime
     private string? _serverConnectionString;
     private string? _databaseName;
 
+    private string? _runtimeRole;
+
+    /// <summary>What the tests use: the owner, or (with VEHICLERENTAL_TEST_RUNTIME_ROLE=1) the restricted runtime role.</summary>
     public string ConnectionString { get; private set; } = "";
+
+    /// <summary>The owner: migrations and the cleanup between tests always use it.</summary>
+    public string OwnerConnectionString { get; private set; } = "";
 
     public async Task InitializeAsync()
     {
@@ -36,10 +42,22 @@ public sealed class PostgresFixture : IAsyncLifetime
             await create.ExecuteNonQueryAsync();
         }
 
-        ConnectionString = WithDatabase(_serverConnectionString, _databaseName);
+        OwnerConnectionString = WithDatabase(_serverConnectionString, _databaseName);
 
-        await using VehicleRentalDbContext context = CreateContext();
-        await context.Database.MigrateAsync();
+        await using (var owner = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(OwnerConnectionString)))
+        {
+            await owner.Database.MigrateAsync();
+        }
+
+        if (RuntimeRole.Enabled)
+        {
+            (_runtimeRole, string runtimeConnection) = await RuntimeRole.ProvisionAsync(OwnerConnectionString);
+            ConnectionString = runtimeConnection;
+        }
+        else
+        {
+            ConnectionString = OwnerConnectionString;
+        }
     }
 
     public async Task DisposeAsync()
@@ -56,6 +74,11 @@ public sealed class PostgresFixture : IAsyncLifetime
         await admin.OpenAsync();
         await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_databaseName}\" WITH (FORCE)", admin);
         await drop.ExecuteNonQueryAsync();
+
+        if (_runtimeRole is not null)
+        {
+            await RuntimeRole.DropAsync(_serverConnectionString, _runtimeRole);
+        }
     }
 
     public VehicleRentalDbContext CreateContext() =>
@@ -66,7 +89,8 @@ public sealed class PostgresFixture : IAsyncLifetime
     /// <summary>Empties every table, so each test starts from a clean database.</summary>
     public async Task ResetAsync()
     {
-        await using VehicleRentalDbContext context = CreateContext();
+        // The owner empties the tables: the runtime role has no TRUNCATE (nor should it).
+        await using var context = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(OwnerConnectionString));
         await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\", \"Users\", \"Companies\" CASCADE");
     }
 

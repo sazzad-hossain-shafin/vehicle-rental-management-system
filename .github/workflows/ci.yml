@@ -94,16 +94,32 @@ jobs:
           dotnet test VehicleRentalManagementSystem.slnx -c Release --no-build
           --logger "trx" --results-directory TestResults
 
+      # The booking, concurrency and authentication suites again, but with the application side connecting as the
+      # restricted runtime role (no superuser, no table ownership, no BYPASSRLS), provisioned with the SAME SQL Docker
+      # Compose runs. The API suite also starts the API with Tenancy:DatabaseRoleCheck=Enforce.
+      - name: Test as the restricted runtime role
+        env:
+          VEHICLERENTAL_TEST_RUNTIME_ROLE: "1"
+        run: |
+          filter="FullyQualifiedName~BookingRace|FullyQualifiedName~ConcurrencyTests|FullyQualifiedName~UnitOfWork|FullyQualifiedName~RentalWorkflow|FullyQualifiedName~ReservationPersistence|FullyQualifiedName~AccountService|FullyQualifiedName~AuthenticationApi|FullyQualifiedName~SessionCookie|FullyQualifiedName~AuthorizationMatrix|FullyQualifiedName~CustomerOwnership|FullyQualifiedName~ReservationApi|FullyQualifiedName~RentalApi|FullyQualifiedName~VehicleApi|FullyQualifiedName~CustomerApi|FullyQualifiedName~AdminSeeding"
+          for project in tests/VehicleRental.Infrastructure.IntegrationTests tests/VehicleRental.Api.Tests; do
+            dotnet test "$project" -c Release --no-build --filter "$filter" --logger "trx;LogFilePrefix=runtime-role" --results-directory TestResultsRuntimeRole
+          done
+
       - name: Verify no test was skipped
         if: success() || failure()
-        run: python3 scripts/ci/check-test-results.py TestResults tests
+        run: |
+          python3 scripts/ci/check-test-results.py TestResults tests
+          python3 scripts/ci/check-test-results.py TestResultsRuntimeRole tests 2
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results
-          path: TestResults/**/*.trx
+          path: |
+            TestResults/**/*.trx
+            TestResultsRuntimeRole/**/*.trx
           if-no-files-found: warn
           retention-days: 14
 
@@ -123,7 +139,7 @@ jobs:
           bash scripts/init-env.sh
           # Mask the generated values so they can never appear in logs.
           while IFS='=' read -r key value; do
-            case "$key" in POSTGRES_PASSWORD|JWT_SIGNING_KEY|ADMIN_PASSWORD)
+            case "$key" in POSTGRES_PASSWORD|POSTGRES_APP_PASSWORD|JWT_SIGNING_KEY|ADMIN_PASSWORD)
               [ -n "$value" ] && echo "::add-mask::$value" ;;
             esac
           done < .env

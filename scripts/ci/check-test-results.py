@@ -11,7 +11,7 @@ files (machine-readable XML), not the console text, and fails on:
 
 It deliberately does NOT hard-code how many tests there should be, so adding a test never breaks it.
 
-Usage: check-test-results.py [RESULTS_DIR] [TESTS_DIR]     (defaults: TestResults, tests)
+Usage: check-test-results.py [RESULTS_DIR] [TESTS_DIR] [EXPECTED_PROJECTS]     (defaults: TestResults, tests, every project under TESTS_DIR)
 """
 import glob
 import os
@@ -25,6 +25,8 @@ NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 def main() -> int:
     results_dir = sys.argv[1] if len(sys.argv) > 1 else "TestResults"
     tests_dir = sys.argv[2] if len(sys.argv) > 2 else "tests"
+    # Optional: how many projects were meant to report (a filtered run covers only some of the test projects).
+    expected_projects = int(sys.argv[3]) if len(sys.argv) > 3 else None
 
     trx_files = sorted(glob.glob(os.path.join(results_dir, "**", "*.trx"), recursive=True))
     test_projects = sorted(glob.glob(os.path.join(tests_dir, "*", "*.csproj")))
@@ -36,9 +38,11 @@ def main() -> int:
     if not trx_files:
         problems.append(f"No .trx files found under '{results_dir}'. The tests did not run or did not report.")
 
-    if len(trx_files) < len(test_projects):
+    needed = expected_projects if expected_projects is not None else len(test_projects)
+
+    if len(trx_files) < needed:
         problems.append(
-            f"Found {len(trx_files)} result file(s) but there are {len(test_projects)} test projects: "
+            f"Found {len(trx_files)} result file(s) but expected {needed} test projects: "
             "at least one project did not report results."
         )
 

@@ -42,6 +42,35 @@ services:
         condition: service_healthy
     restart: "no"
 
+  # Creates (or re-asserts) the restricted runtime role the API connects as, and grants it exactly what the API needs.
+  # Runs as the migration owner AFTER the migrations, then exits. Safe to run on every start: it is idempotent, never
+  # elevates the role, and refuses to run if the runtime role is the owner. The SQL is scripts/sql/provision-runtime-role.sql.
+  # The passwords are passed as PostgreSQL startup options in the environment, never on a command line.
+  db-roles:
+    image: postgres:17
+    entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "--no-psqlrc", "-q", "-f", "/provision-runtime-role.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-vehiclerental}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      PGDATABASE: ${POSTGRES_DB:-vehiclerental}
+      PGOPTIONS: "-c provision.app_user=${POSTGRES_APP_USER:-vehiclerental_app} -c provision.app_password=${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env (run: bash scripts/init-env.sh --upgrade)}"
+    volumes:
+      - ./scripts/sql/provision-runtime-role.sql:/provision-runtime-role.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   api:
     build:
       context: .
@@ -50,7 +79,11 @@ services:
       # Development makes the OpenAPI document and the interactive reference available. Set
       # ASPNETCORE_ENVIRONMENT=Production in .env to hide them.
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__VehicleRentalDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-vehiclerental};Username=${POSTGRES_USER:-vehiclerental};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
+      # The API connects as the restricted RUNTIME role (owns nothing, cannot change the schema, no BYPASSRLS), not as the
+      # table owner. The migration job above and the db-roles service use the owner; the two credentials stay separate.
+      ConnectionStrings__VehicleRentalDatabase: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-vehiclerental};Username=${POSTGRES_APP_USER:-vehiclerental_app};Password=${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env (run: bash scripts/init-env.sh --upgrade)};GSS Encryption Mode=Disable"
+      # Refuse to start if the database role is unsafe (superuser, BYPASSRLS, owns tables, can change the schema).
+      Tenancy__DatabaseRoleCheck: Enforce
       # The API refuses to start without a strong signing key; there is deliberately no default.
       Jwt__SigningKey: ${JWT_SIGNING_KEY:?Set JWT_SIGNING_KEY in .env (at least 32 random characters)}
       Jwt__Issuer: ${JWT_ISSUER:-VehicleRental.Api}
@@ -64,6 +97,8 @@ services:
       postgres:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      db-roles:
         condition: service_completed_successfully
     healthcheck:
       # /health is the readiness check: the database must be reachable and migrated. (/health/live only

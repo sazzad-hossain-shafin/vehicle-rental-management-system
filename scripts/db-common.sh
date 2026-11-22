@@ -33,6 +33,15 @@ env_value() {
 PG_USER="$(env_value POSTGRES_USER vehiclerental)"
 LIVE_DB="$(env_value POSTGRES_DB vehiclerental)"
 
+# compose.yaml requires POSTGRES_APP_PASSWORD (the API's restricted role) before it will even render. These scripts only
+# talk to the postgres and migrate services and never use that password, so an older .env that predates it must not stop
+# them: a placeholder is supplied for this process only when .env has no value. (Run `bash scripts/init-env.sh --upgrade`
+# to add the real one before starting the stack.)
+if [[ -z "${POSTGRES_APP_PASSWORD:-}" ]]; then
+  POSTGRES_APP_PASSWORD="$(env_value POSTGRES_APP_PASSWORD)"
+  export POSTGRES_APP_PASSWORD="${POSTGRES_APP_PASSWORD:-placeholder-not-used-by-the-database-scripts}"
+fi
+
 compose() { (cd "$ROOT" && docker compose "$@"); }
 
 die() { echo "error: $*" >&2; exit 1; }

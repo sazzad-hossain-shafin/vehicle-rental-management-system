@@ -113,6 +113,10 @@ docker compose stop               # stop, keeping containers and data
 docker compose down               # stop and remove containers. YOUR DATA IS KEPT (named volume)
 ```
 
+### The API's database role
+
+The API does **not** connect as the table owner. Start-up runs `postgres` -> `migrate` (as `POSTGRES_USER`, the owner) -> `db-roles` (as the owner; creates or re-asserts the restricted role `POSTGRES_APP_USER`) -> `api` (as the restricted role, with `Tenancy__DatabaseRoleCheck=Enforce`, so it refuses to start if its role is unsafe). The two passwords are separate secrets. An older `.env` needs one more value: run `bash scripts/init-env.sh --upgrade`. Details, checks and rollback: [runtime role runbook](multi-tenancy/runtime-role-runbook.md).
+
 ### Backing up, and rehearsing a migration on a copy
 
 ```bash
