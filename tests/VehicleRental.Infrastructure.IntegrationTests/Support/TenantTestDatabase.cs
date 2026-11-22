@@ -168,6 +168,21 @@ public class TenantTestDatabase : IAsyncLifetime
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>Runs a parameterised statement as the owner, for arranging data the application itself cannot write yet.</summary>
+    public async Task OwnerExecuteAsync(string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var owner = new NpgsqlConnection(OwnerConnectionString);
+        await owner.OpenAsync();
+        await using var command = new NpgsqlCommand(sql, owner);
+
+        foreach ((string name, object value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        await command.ExecuteNonQueryAsync();
+    }
+
     public async Task<Guid> AddCustomerAsync(string number = "T-1")
     {
         var customer = new Customer(number + "-" + Guid.NewGuid().ToString("N")[..6], "Customer " + number);
