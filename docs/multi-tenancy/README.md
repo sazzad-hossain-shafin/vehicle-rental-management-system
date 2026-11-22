@@ -10,6 +10,7 @@ These documents support [ADR 007](../architecture/007-multi-company-tenancy.md).
 - [Backup, restore and migration rehearsal](backup-restore-rehearsal.md): scripts that prove a migration on a copy of the data first.
 - [Tenant infrastructure](tenant-infrastructure.md): the tenant context, the transaction-local tenant setting, the unit of work joining the tenant transaction, the restricted runtime role and its startup check (built and switched off).
 - [Runbook: the restricted runtime role](runtime-role-runbook.md): upgrading `.env`, checking the role, rolling back and rotating the password.
+- [Security hardening before RLS](security-hardening-before-rls.md): what must be strengthened before the backfill (14A-5) and before real-table RLS (14A-7), the alternatives to trusting the tenant setting, and the acceptance criteria.
 
 Status of the work:
 
