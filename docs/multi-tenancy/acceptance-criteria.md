@@ -42,6 +42,20 @@ The proof of concept lives in its own test project, uses its own throwaway table
 - [ ] A backup, restore and migration rehearsal on a copy of the development data passes, the live development database is not migrated, and the result is recorded.
 - [ ] The write gap and the backfill and cutover strategy are documented. No backfill, tenant resolution, RLS, runtime role, authorization, registration, invitation or frontend change is included.
 
+## PR 14A-4: tenant infrastructure and the restricted runtime role
+
+- [ ] No production route binds a tenant, no production table has Row-Level Security, no query filter is added, and `Tenancy:Enabled` is `false` by default. With it off, binding throws and the tenant routes answer 404.
+- [ ] The tenant is bound before the transaction, the transaction-local setting is applied and confirmed inside it before any query, and commit, rollback and disposal all discard it. Proven with the driver's connection reset disabled.
+- [ ] The bound tenant can never be changed; reads, writes and single-statement saves outside the tenant transaction are refused, not answered with nothing.
+- [ ] The unit of work joins the tenant transaction; with no tenant it runs its original path unchanged. The row lock, the no-overlap constraint, the one-active-rental rule and the 409 messages are unchanged, including the two race scenarios.
+- [ ] Pooling and concurrency tests pass: a pool of one, alternating tenants, 240 overlapping requests, cancellation, rollback and a database error followed by reuse.
+- [ ] The runtime role is not a superuser, owns nothing, has no `BYPASSRLS`, cannot create objects, cannot change the migration history, is in no other role, and has only the privileges the API needs; the provisioning SQL is idempotent, de-elevates a role, refuses the owner as the runtime role, and never prints the password.
+- [ ] `Enforce` refuses to start with an unsafe role and leaks neither a role name, a password nor a connection string; `Warn` and `Off` behave as documented; Docker Compose and CI use `Enforce`.
+- [ ] The whole API suite and the whole infrastructure suite pass connecting as the runtime role; CI runs the booking, concurrency and authentication classes that way.
+- [ ] A Docker Compose smoke test on an isolated stack passes with the runtime role, and the rollback (previous compose file over the same volume, then forward again) works.
+- [ ] The existing development database and running stack were not modified.
+- [ ] PgBouncer compatibility is documented as unverified, and the arbitrary-SQL limit of RLS is documented.
+
 ## Later steps (for reference, each needs approval)
 
 **Schema expand and backfill**

@@ -43,7 +43,11 @@ builder.Services.AddOpenApi(options =>
 });
 
 builder.Services.AddHealthChecks()
-    .AddCheck<DatabaseHealthCheck>("database", timeout: TimeSpan.FromSeconds(5));
+    .AddCheck<DatabaseHealthCheck>("database", timeout: TimeSpan.FromSeconds(5))
+    // Readiness only (not /health/live): is the database role the API runs as safe? See Tenancy:DatabaseRoleCheck.
+    .AddCheck<DatabaseRoleHealthCheck>("database-role", timeout: TimeSpan.FromSeconds(10));
+// Runs first, and refuses to start the API (Enforce mode) when its database role is unsafe.
+builder.Services.AddHostedService<DatabaseRoleStartupCheck>();
 builder.Services.AddHostedService<DatabaseStartupCheck>();
 builder.Services.AddHostedService<AdminSeedService>();
 

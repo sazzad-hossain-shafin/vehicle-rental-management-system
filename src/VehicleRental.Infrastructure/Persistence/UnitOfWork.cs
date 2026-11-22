@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using VehicleRental.Application.Abstractions;
 using VehicleRental.Application.Exceptions;
+using VehicleRental.Application.Tenancy;
+using VehicleRental.Infrastructure.Tenancy;
 using VehicleRental.Infrastructure.Persistence.Configurations;
 
 namespace VehicleRental.Infrastructure.Persistence;
@@ -43,6 +45,14 @@ public sealed class UnitOfWork : IUnitOfWork, IAsyncDisposable
 
     public async Task LockVehicleAsync(Guid vehicleId, CancellationToken cancellationToken = default)
     {
+        // A bound tenant means the request already runs inside its tenant transaction: join it instead of starting a
+        // second one. With no tenant (every path today) the code below runs exactly as before.
+        if (_db.Tenant is { IsBound: true } tenant)
+        {
+            await LockJoinedAsync(tenant, vehicleId, cancellationToken);
+            return;
+        }
+
         try
         {
             if (_transaction is null)
@@ -74,6 +84,12 @@ public sealed class UnitOfWork : IUnitOfWork, IAsyncDisposable
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (_db.Tenant is { IsBound: true } tenant)
+        {
+            await SaveJoinedAsync(tenant, cancellationToken);
+            return;
+        }
+
         try
         {
             await _db.SaveChangesAsync(cancellationToken);
@@ -106,6 +122,60 @@ public sealed class UnitOfWork : IUnitOfWork, IAsyncDisposable
             await DiscardTransactionAsync();
 
             throw;
+        }
+    }
+
+    // ---- tenant mode: join the transaction the tenant scope opened -------------------------------------------------
+    //
+    // The tenant transaction (ITenantTransaction) is begun first, with the tenant setting applied inside it. These two
+    // methods run INSIDE it: they take the same vehicle row lock and save the same changes, with the same conflict
+    // messages, but they never begin, commit or discard a transaction: the tenant scope owns it, and it rolls back when a
+    // request fails (a failed statement has already aborted the PostgreSQL transaction, so nothing partial can commit).
+
+    private async Task LockJoinedAsync(TenantContext tenant, Guid vehicleId, CancellationToken cancellationToken)
+    {
+        EnsureInTenantTransaction(tenant);
+
+        try
+        {
+            await _db.Database.ExecuteSqlRawAsync("SET LOCAL lock_timeout = '" + LockTimeout + "'", cancellationToken);
+
+            await _db.Database.ExecuteSqlAsync(
+                $"SELECT \"Id\" FROM \"Vehicles\" WHERE \"Id\" = {vehicleId} FOR UPDATE",
+                cancellationToken);
+        }
+        catch (Exception ex) when (FindPostgresError(ex) is { } error && ToConflict(error) is not null)
+        {
+            throw ToConflict(error)!;
+        }
+    }
+
+    private async Task SaveJoinedAsync(TenantContext tenant, CancellationToken cancellationToken)
+    {
+        EnsureInTenantTransaction(tenant);
+
+        try
+        {
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException(
+                "The data was changed by another request. Please try again.");
+        }
+        catch (Exception ex) when (ex is DbUpdateException or InvalidOperationException
+                                   && FindPostgresError(ex) is { } error
+                                   && ToConflict(error) is not null)
+        {
+            throw ToConflict(error)!;
+        }
+    }
+
+    private void EnsureInTenantTransaction(TenantContext tenant)
+    {
+        if (!tenant.IsApplied(_db.Database.CurrentTransaction?.GetDbTransaction()))
+        {
+            throw new TenantRequiredException("A tenant-scoped unit of work must run inside the tenant transaction.");
         }
     }
 

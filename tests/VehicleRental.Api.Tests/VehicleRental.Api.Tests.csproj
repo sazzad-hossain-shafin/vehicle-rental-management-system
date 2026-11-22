@@ -20,6 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The provisioning SQL is the single source Docker Compose also runs (see Support/RuntimeRole.cs). -->
+    <EmbeddedResource Include="..\..\scripts\sql\provision-runtime-role.sql" LogicalName="provision-runtime-role.sql" />
+    <!-- Preview Row-Level Security policies, applied only inside disposable test databases. One file, shared with the infrastructure tests. -->
+    <EmbeddedResource Include="..\VehicleRental.Infrastructure.IntegrationTests\Support\preview-rls.sql" LogicalName="preview-rls.sql" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\VehicleRental.Api\VehicleRental.Api.csproj" />
     <ProjectReference Include="..\..\src\VehicleRental.Infrastructure\VehicleRental.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\VehicleRental.Application\VehicleRental.Application.csproj" />

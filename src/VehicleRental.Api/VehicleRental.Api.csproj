@@ -18,5 +18,10 @@
     <UserSecretsId>c4f1d3a8-6b2e-4f0a-9d57-3e8a1b7c2d94</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The tenant endpoint filters are internal (no production route uses them yet); the API tests exercise them directly. -->
+    <InternalsVisibleTo Include="VehicleRental.Api.Tests" />
+  </ItemGroup>
+
 </Project>
 

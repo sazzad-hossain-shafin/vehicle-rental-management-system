@@ -10,8 +10,14 @@
 set -uo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Values from .env are only defaults: a variable already set in the environment (for example BASE_URL, ADMIN_EMAIL and
+# ADMIN_PASSWORD for an isolated test stack) always wins, so .env can never redirect or override an explicit run.
 if [[ -f "$root/.env" ]]; then
-  set -a; source <(sed 's/\r$//' "$root/.env"); set +a
+  while IFS='=' read -r key value; do
+    if [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ && -z "${!key:-}" ]]; then
+      export "$key=$value"
+    fi
+  done < <(sed 's/\r$//' "$root/.env")
 fi
 
 base="${BASE_URL:-http://localhost:${API_PORT:-8080}}"
@@ -35,6 +41,13 @@ echo "Smoke test against $base"
 echo "Health"
 check "/health/live is healthy" 200 "$(status "$base/health/live")"
 check "/health is healthy (database reachable and migrated)" 200 "$(status "$base/health")"
+# The API must be running as the restricted runtime role (Docker Compose sets Tenancy__DatabaseRoleCheck=Enforce, so it
+# would not have started otherwise). Skipped when the stack does not enforce the check (for example a local dotnet run).
+if get "$base/health" | grep -q 'The database role is safe'; then
+  check "the API runs as the restricted database role (role check passed)" yes yes
+elif get "$base/health" | grep -q 'switched off\|Warning'; then
+  echo "  --  the database role check is not enforced in this stack (skipped)"
+fi
 
 echo "Public and protected access"
 check "anonymous vehicle browsing" 200 "$(status "$base/api/v1/vehicles")"

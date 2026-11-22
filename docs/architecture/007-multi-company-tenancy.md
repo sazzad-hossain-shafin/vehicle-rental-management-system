@@ -116,4 +116,6 @@ The spike code is **not** production code. The production implementation must me
 |---|---|
 | 14A-1 | This record and the supporting documents. No code. |
 | 14A-2 | An isolated RLS and connection-pooling proof of concept with adversarial tests. No production table is touched. **Done** (47 tests; outcome above). |
+| 14A-3 | The additive schema expand. **Done** ([details](../multi-tenancy/expand-and-cutover.md)). |
+| 14A-4 | The tenant infrastructure and the restricted runtime role, built and switched off. See [tenant infrastructure](../multi-tenancy/tenant-infrastructure.md). |
 | later (each needs approval) | schema expand, tenant context, backfill, repository scoping, contract migration, authorization, isolation test suite, slug routes in the website; then registration and invitations (14B) |

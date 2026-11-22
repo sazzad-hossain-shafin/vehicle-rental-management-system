@@ -25,7 +25,13 @@ public sealed class PostgresApiFixture : IAsyncLifetime
 
     internal ApiFactory Factory { get; private set; } = null!;
 
+    private string? _runtimeRole;
+
+    /// <summary>What the API connects as: the owner, or (with VEHICLERENTAL_TEST_RUNTIME_ROLE=1) the restricted runtime role.</summary>
     public string ConnectionString { get; private set; } = "";
+
+    /// <summary>The owner of the main test database: the cleanup between tests uses it (the runtime role cannot TRUNCATE).</summary>
+    public string OwnerConnectionString { get; private set; } = "";
 
     public async Task InitializeAsync()
     {
@@ -37,7 +43,19 @@ public sealed class PostgresApiFixture : IAsyncLifetime
         }
 
         ConnectionString = await CreateDatabaseAsync(applyMigrations: true);
-        Factory = new ApiFactory(ConnectionString);
+        OwnerConnectionString = ConnectionString;
+
+        Dictionary<string, string?>? settings = null;
+
+        if (RuntimeRole.Enabled)
+        {
+            (_runtimeRole, ConnectionString) = await RuntimeRole.ProvisionAsync(OwnerConnectionString);
+
+            // As in Docker Compose: the API must START with the role check enforced, which proves the role is safe.
+            settings = new Dictionary<string, string?> { ["Tenancy:DatabaseRoleCheck"] = "Enforce" };
+        }
+
+        Factory = new ApiFactory(ConnectionString, extraSettings: settings);
     }
 
     public async Task DisposeAsync()
@@ -61,6 +79,11 @@ public sealed class PostgresApiFixture : IAsyncLifetime
         {
             await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{database}\" WITH (FORCE)", admin);
             await drop.ExecuteNonQueryAsync();
+        }
+
+        if (_runtimeRole is not null)
+        {
+            await RuntimeRole.DropAsync(_serverConnectionString, _runtimeRole);
         }
     }
 
@@ -91,7 +114,7 @@ public sealed class PostgresApiFixture : IAsyncLifetime
     /// <summary>Empties every business and account table of the main test database (the seeded roles stay).</summary>
     public async Task ResetAsync()
     {
-        await using var context = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(ConnectionString));
+        await using var context = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(OwnerConnectionString));
         await context.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Rentals\", \"Customers\", \"Vehicles\", \"Users\" CASCADE");
     }
 

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Conventions.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using VehicleRental.Domain.Entities;
 using VehicleRental.Infrastructure.Identity;
+using VehicleRental.Infrastructure.Tenancy;
 
 namespace VehicleRental.Infrastructure.Persistence;
 
@@ -17,9 +18,17 @@ namespace VehicleRental.Infrastructure.Persistence;
 /// </summary>
 public class VehicleRentalDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
-    public VehicleRentalDbContext(DbContextOptions<VehicleRentalDbContext> options)
+    /// <summary>
+    /// The tenant of this context's scope, or null (the default, and always null outside the web application's DI
+    /// scope). Only the tenant interceptors and the unit of work read it. A context with no tenant behaves exactly as it
+    /// did before Phase 14A-4.
+    /// </summary>
+    internal TenantContext? Tenant { get; }
+
+    public VehicleRentalDbContext(DbContextOptions<VehicleRentalDbContext> options, TenantContext? tenant = null)
         : base(options)
     {
+        Tenant = tenant;
     }
 
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
