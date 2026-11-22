@@ -26,7 +26,7 @@ public class TenantContextTests
     {
         var defaults = new TenancyOptions();
         Assert.False(defaults.Enabled);
-        Assert.Equal(DatabaseRoleCheckMode.Warn, defaults.DatabaseRoleCheck);
+        Assert.Null(defaults.DatabaseRoleCheck); // not configured: the API picks Warn in Development, Enforce elsewhere
 
         TenantContext tenant = Create(enabled: false);
 

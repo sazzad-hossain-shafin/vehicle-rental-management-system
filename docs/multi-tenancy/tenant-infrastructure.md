@@ -68,9 +68,11 @@ The two passwords are separate secrets. The script reads the role name and passw
 
 | Mode | Behaviour | Default for |
 |---|---|---|
-| `Off` | no check | nothing |
-| `Warn` | logs each problem; `/health` stays ready but says so in its description | local development, `dotnet run` |
-| `Enforce` | the API **refuses to start**; `/health` is unhealthy while the role cannot be confirmed safe | Docker Compose and CI |
+| `Off` | no check. **Refused outside the Development environment** (the API will not start) | nothing |
+| `Warn` | logs each problem; `/health` stays ready but says so in its description. Outside Development only as a temporary emergency setting, and logged as one | the Development environment (`dotnet run`) when the setting is absent |
+| `Enforce` | the API **refuses to start**; `/health` is unhealthy while the role cannot be confirmed safe | **every other environment** when the setting is absent; Docker Compose and CI set it explicitly |
+
+When the setting is absent, the environment decides (`ASPNETCORE_ENVIRONMENT`): Development gets `Warn`, anything else (Production, Staging, a custom name) gets `Enforce`. A deployment that forgets the setting therefore cannot start as an unsafe role.
 
 Messages say what is wrong and never include the role name, a password or a connection string. An unreachable database at startup is not a violation (the API already starts degraded); the readiness check keeps trying and, in `Enforce`, stays unhealthy until it can confirm the role is safe.
 
@@ -81,7 +83,7 @@ The part of the spike's check that asks "is RLS enabled and forced on the tenant
 | Setting | Default | Meaning |
 |---|---|---|
 | `Tenancy:Enabled` | `false` | master switch for tenant mode |
-| `Tenancy:DatabaseRoleCheck` | `Warn` | `Off`, `Warn` or `Enforce` |
+| `Tenancy:DatabaseRoleCheck` | not set: `Warn` in Development, `Enforce` elsewhere | `Off` (Development only), `Warn` or `Enforce` |
 | `POSTGRES_APP_USER` | `vehiclerental_app` | runtime role name (Compose) |
 | `POSTGRES_APP_PASSWORD` | none, required | runtime role password (Compose): letters and digits, at least 16 characters |
 

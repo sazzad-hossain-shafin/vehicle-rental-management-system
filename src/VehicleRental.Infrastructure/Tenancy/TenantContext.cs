@@ -29,9 +29,10 @@ public sealed class TenancyOptions
 
     /// <summary>
     /// What to do when the application's database role is unsafe (superuser, BYPASSRLS, owns tables, can create objects,
-    /// has migration privileges). Warn by default for local development; Docker Compose and CI set Enforce.
+    /// has migration privileges). Null means "not configured": the API then uses Warn in the Development environment and
+    /// Enforce everywhere else, and refuses Off outside Development (see DatabaseRoleCheckPolicy in the API).
     /// </summary>
-    public DatabaseRoleCheckMode DatabaseRoleCheck { get; set; } = DatabaseRoleCheckMode.Warn;
+    public DatabaseRoleCheckMode? DatabaseRoleCheck { get; set; }
 }
 
 /// <summary>
