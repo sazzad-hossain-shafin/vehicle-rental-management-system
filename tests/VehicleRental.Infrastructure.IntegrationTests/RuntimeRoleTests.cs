@@ -133,7 +133,9 @@ public class RuntimeRoleTests : IClassFixture<RuntimeRoleTests.NoPreviewDatabase
     public async Task The_role_cannot_become_the_owner_or_change_the_session_into_something_else()
     {
         await using NpgsqlConnection app = await OpenAppAsync();
-        await using var command = new NpgsqlCommand("SET ROLE postgres", app);
+        // The owner's real name: it differs between machines (CI's superuser is not called "postgres"), and a role that does not exist would fail for a different reason.
+        string owner = new NpgsqlConnectionStringBuilder(_db.OwnerConnectionString).Username!;
+        await using var command = new NpgsqlCommand($"SET ROLE \"{owner}\"", app);
 
         PostgresException error = await Assert.ThrowsAsync<PostgresException>(() => command.ExecuteNonQueryAsync());
         Assert.Equal("42501", error.SqlState);
