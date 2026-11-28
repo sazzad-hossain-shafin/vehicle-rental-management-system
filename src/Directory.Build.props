@@ -1,0 +1,19 @@
+<Project>
+
+  <!--
+    Applies to every production project under src/ (MSBuild picks up the nearest Directory.Build.props), in every build:
+    local Debug builds, CI, and the Docker image build (which copies src/).
+
+    EF1002 and EF1003 are EF Core's SQL-injection analyzers: an interpolated or concatenated string passed to a "Raw" SQL
+    method (ExecuteSqlRaw, FromSqlRaw, SqlQueryRaw). By default they are only warnings, so a local build would succeed.
+    Here they are always errors. Use ExecuteSql / FromSql / SqlQuery with an interpolated string instead: those
+    parameterise every value. See docs/multi-tenancy/security-hardening-before-rls.md.
+
+    Do not suppress them (NoWarn, #pragma, SuppressMessage, .editorconfig): tests/VehicleRental.ArchitectureTests fails if
+    anything under src/ does.
+  -->
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);EF1002;EF1003</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
