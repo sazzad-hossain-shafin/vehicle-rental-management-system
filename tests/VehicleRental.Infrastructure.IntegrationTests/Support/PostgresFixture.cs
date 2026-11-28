@@ -17,6 +17,8 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     private string? _runtimeRole;
 
+    private readonly OwnedConnectionPools _pools = new();
+
     /// <summary>What the tests use: the owner, or (with VEHICLERENTAL_TEST_RUNTIME_ROLE=1) the restricted runtime role.</summary>
     public string ConnectionString { get; private set; } = "";
 
@@ -42,7 +44,7 @@ public sealed class PostgresFixture : IAsyncLifetime
             await create.ExecuteNonQueryAsync();
         }
 
-        OwnerConnectionString = WithDatabase(_serverConnectionString, _databaseName);
+        OwnerConnectionString = _pools.Track(WithDatabase(_serverConnectionString, _databaseName));
 
         await using (var owner = new VehicleRentalDbContext(VehicleRentalDbContextOptions.Create(OwnerConnectionString)))
         {
@@ -52,7 +54,7 @@ public sealed class PostgresFixture : IAsyncLifetime
         if (RuntimeRole.Enabled)
         {
             (_runtimeRole, string runtimeConnection) = await RuntimeRole.ProvisionAsync(OwnerConnectionString);
-            ConnectionString = runtimeConnection;
+            ConnectionString = _pools.Track(runtimeConnection);
         }
         else
         {
@@ -68,7 +70,8 @@ public sealed class PostgresFixture : IAsyncLifetime
             return;
         }
 
-        NpgsqlConnection.ClearAllPools();
+        // Only this fixture's pools: other test classes run in parallel and may be using theirs right now.
+        _pools.Clear();
 
         await using var admin = new NpgsqlConnection(WithDatabase(_serverConnectionString, "postgres"));
         await admin.OpenAsync();

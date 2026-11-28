@@ -90,7 +90,12 @@ public class TenancyExpandMigrationTests
 
         public async ValueTask DisposeAsync()
         {
-            NpgsqlConnection.ClearAllPools();
+            // Only this database's pool: other test classes run in parallel and may be using theirs right now.
+            using (var owned = new NpgsqlConnection(ConnectionString))
+            {
+                NpgsqlConnection.ClearPool(owned);
+            }
+
             await using var admin = new NpgsqlConnection(new NpgsqlConnectionStringBuilder(_server) { Database = "postgres" }.ConnectionString);
             await admin.OpenAsync();
             await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \"{_name}\" WITH (FORCE)", admin);
