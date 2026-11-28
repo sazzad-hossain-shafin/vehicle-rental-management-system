@@ -128,7 +128,7 @@ public class DatabaseRoleCheckApiTests
     }
 
     [DatabaseFact]
-    public async Task The_default_is_Warn_so_local_development_with_a_privileged_role_keeps_working()
+    public async Task The_default_in_Development_is_Warn_so_local_development_with_a_privileged_role_keeps_working()
     {
         (string owner, string _, string role) = await NewDatabaseAsync();
 
@@ -140,6 +140,69 @@ public class DatabaseRoleCheckApiTests
             JsonElement check = await RoleCheckAsync(client, HttpStatusCode.OK);
 
             Assert.StartsWith("Warning:", check.GetProperty("description").GetString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await Cleanup(owner, role);
+        }
+    }
+
+    [DatabaseFact]
+    public async Task The_default_outside_Development_is_Enforce_so_a_forgotten_setting_cannot_start_as_an_unsafe_role()
+    {
+        (string owner, string runtime, string role) = await NewDatabaseAsync();
+
+        try
+        {
+            // No Tenancy:DatabaseRoleCheck at all, in Production, connecting as the owner (a superuser).
+            await using var unsafeRole = new ApiFactory(owner, "Production");
+
+            Exception error = Assert.ThrowsAny<Exception>(() => unsafeRole.CreateClient());
+
+            Assert.Contains("not safe", error.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(PasswordOf(owner), error + string.Join("\n", unsafeRole.Logs), StringComparison.Ordinal);
+
+            // The same default with the restricted runtime role starts, and readiness is enforced.
+            await using var safeRole = new ApiFactory(runtime, "Production");
+            using HttpClient client = safeRole.CreateClient();
+
+            JsonElement check = await RoleCheckAsync(client, HttpStatusCode.OK);
+            Assert.Equal("The database role is safe.", check.GetProperty("description").GetString());
+        }
+        finally
+        {
+            await Cleanup(owner, role);
+        }
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public async Task Off_is_refused_outside_Development_even_with_a_safe_role(string environment)
+    {
+        // An unreachable database is enough: the refusal happens before any database work.
+        await using var factory = new ApiFactory(ApiFactory.UnreachableDatabase, environment, extraSettings: Off);
+
+        Exception error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("Tenancy:DatabaseRoleCheck=Off is allowed only in the Development environment", error.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("127.0.0.1", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [DatabaseFact]
+    public async Task An_explicit_Warn_outside_Development_starts_but_is_logged_as_a_temporary_emergency_setting()
+    {
+        (string owner, string _, string role) = await NewDatabaseAsync();
+
+        try
+        {
+            await using var factory = new ApiFactory(owner, "Production", extraSettings: Warn);
+            using HttpClient client = factory.CreateClient();
+
+            JsonElement check = await RoleCheckAsync(client, HttpStatusCode.OK);
+
+            Assert.StartsWith("Warning:", check.GetProperty("description").GetString(), StringComparison.Ordinal);
+            Assert.Contains(factory.Logs, l => l.Contains("temporary emergency setting", StringComparison.Ordinal));
         }
         finally
         {

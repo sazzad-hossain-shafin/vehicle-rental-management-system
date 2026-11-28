@@ -5,10 +5,33 @@ using VehicleRental.Infrastructure.Tenancy;
 namespace VehicleRental.Api.Http;
 
 /// <summary>
+/// Decides the role check mode in force. Production-safe by default: when <c>Tenancy:DatabaseRoleCheck</c> is not set,
+/// Development uses Warn (local work with a privileged role keeps going) and every other environment uses Enforce, so a
+/// deployment that forgets the setting cannot start as an unsafe role. Off is refused outside Development. An explicit
+/// Warn outside Development is allowed only as the documented temporary emergency measure, and is logged as such.
+/// </summary>
+internal static class DatabaseRoleCheckPolicy
+{
+    public static DatabaseRoleCheckMode Resolve(DatabaseRoleCheckMode? configured, IHostEnvironment environment)
+    {
+        bool development = environment.IsDevelopment();
+
+        return configured switch
+        {
+            null => development ? DatabaseRoleCheckMode.Warn : DatabaseRoleCheckMode.Enforce,
+            DatabaseRoleCheckMode.Off when !development => throw new InvalidOperationException(
+                $"Tenancy:DatabaseRoleCheck=Off is allowed only in the Development environment, not in '{environment.EnvironmentName}'. " +
+                "Remove the setting (Enforce is the default) or, as a temporary emergency measure only, use Warn; " +
+                "see docs/multi-tenancy/runtime-role-runbook.md."),
+            _ => configured.Value,
+        };
+    }
+}
+
+/// <summary>
 /// At startup, checks that the database role the API connects as is safe (not a superuser, no BYPASSRLS, owns no tables,
-/// cannot create objects, cannot change the migration history). What happens on a violation depends on
-/// <c>Tenancy:DatabaseRoleCheck</c>: Off does nothing, Warn logs it (the default, so local development with a privileged
-/// role keeps working), Enforce refuses to start. Docker Compose and CI use Enforce.
+/// cannot create objects, cannot change the migration history). What happens on a violation depends on the mode chosen by
+/// <see cref="DatabaseRoleCheckPolicy"/>: Off does nothing, Warn logs it, Enforce refuses to start.
 /// An unreachable database is not a violation here (the API already starts degraded in that case); the health check below
 /// keeps checking and reports Unhealthy in Enforce mode until it can confirm the role is safe.
 /// </summary>
@@ -16,18 +39,33 @@ internal sealed class DatabaseRoleStartupCheck : IHostedService
 {
     private readonly IServiceScopeFactory _scopes;
     private readonly IOptions<TenancyOptions> _options;
+    private readonly IHostEnvironment _environment;
     private readonly ILogger<DatabaseRoleStartupCheck> _logger;
 
-    public DatabaseRoleStartupCheck(IServiceScopeFactory scopes, IOptions<TenancyOptions> options, ILogger<DatabaseRoleStartupCheck> logger)
+    public DatabaseRoleStartupCheck(
+        IServiceScopeFactory scopes,
+        IOptions<TenancyOptions> options,
+        IHostEnvironment environment,
+        ILogger<DatabaseRoleStartupCheck> logger)
     {
         _scopes = scopes;
         _options = options;
+        _environment = environment;
         _logger = logger;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        DatabaseRoleCheckMode mode = _options.Value.DatabaseRoleCheck;
+        // Throws (and so refuses to start) for Off outside Development.
+        DatabaseRoleCheckMode mode = DatabaseRoleCheckPolicy.Resolve(_options.Value.DatabaseRoleCheck, _environment);
+
+        if (mode == DatabaseRoleCheckMode.Warn && !_environment.IsDevelopment())
+        {
+            _logger.LogWarning(
+                "Tenancy:DatabaseRoleCheck is Warn outside Development ({Environment}). This is a temporary emergency setting only: " +
+                "an unsafe database role will not stop the API. Remove it as soon as the role is fixed.",
+                _environment.EnvironmentName);
+        }
 
         if (mode == DatabaseRoleCheckMode.Off)
         {
@@ -68,7 +106,7 @@ internal sealed class DatabaseRoleStartupCheck : IHostedService
         if (mode == DatabaseRoleCheckMode.Enforce)
         {
             throw new InvalidOperationException(
-                "The application's database role is not safe (Tenancy:DatabaseRoleCheck is Enforce). " +
+                "The application's database role is not safe (the database role check is Enforce). " +
                 "Connect as the restricted runtime role created by the db-roles service; see docs/multi-tenancy/tenant-infrastructure.md.");
         }
     }
@@ -88,19 +126,21 @@ internal sealed class DatabaseRoleHealthCheck : IHealthCheck
 
     private readonly IServiceScopeFactory _scopes;
     private readonly IOptions<TenancyOptions> _options;
+    private readonly IHostEnvironment _environment;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DateTimeOffset _checkedAt = DateTimeOffset.MinValue;
     private HealthCheckResult _last;
 
-    public DatabaseRoleHealthCheck(IServiceScopeFactory scopes, IOptions<TenancyOptions> options)
+    public DatabaseRoleHealthCheck(IServiceScopeFactory scopes, IOptions<TenancyOptions> options, IHostEnvironment environment)
     {
         _scopes = scopes;
         _options = options;
+        _environment = environment;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        DatabaseRoleCheckMode mode = _options.Value.DatabaseRoleCheck;
+        DatabaseRoleCheckMode mode = DatabaseRoleCheckPolicy.Resolve(_options.Value.DatabaseRoleCheck, _environment);
 
         if (mode == DatabaseRoleCheckMode.Off)
         {
