@@ -20,6 +20,7 @@ public class TenantTestDatabase : IAsyncLifetime
 {
     private const string Prefix = "vehiclerental_it_tenant_";
 
+    private readonly OwnedConnectionPools _pools = new();
     private string? _server;
     private string? _database;
 
@@ -72,7 +73,8 @@ public class TenantTestDatabase : IAsyncLifetime
             return;
         }
 
-        NpgsqlConnection.ClearAllPools();
+        // Only this fixture's pools: other test classes run in parallel and may be using theirs right now.
+        _pools.Clear();
 
         await using var admin = new NpgsqlConnection(WithDatabase(_server, "postgres"));
         await admin.OpenAsync();
@@ -80,14 +82,14 @@ public class TenantTestDatabase : IAsyncLifetime
         await Execute(admin, $"DROP ROLE IF EXISTS \"{AppUser}\"");
     }
 
-    public string OwnerConnectionString => WithDatabase(_server!, _database!);
+    public string OwnerConnectionString => _pools.Track(WithDatabase(_server!, _database!));
 
     /// <summary>The restricted runtime role's connection string. <paramref name="extra"/> adds pool settings and a unique application name.</summary>
     public string AppConnectionString(string? extra = null)
     {
         string text = new NpgsqlConnectionStringBuilder(OwnerConnectionString) { Username = AppUser, Password = AppPassword }.ConnectionString;
 
-        return string.IsNullOrEmpty(extra) ? text : text + ";" + extra;
+        return _pools.Track(string.IsNullOrEmpty(extra) ? text : text + ";" + extra);
     }
 
     /// <summary>A connection string with its own pool (the pool is keyed by the string, so a unique name gives each test one).</summary>

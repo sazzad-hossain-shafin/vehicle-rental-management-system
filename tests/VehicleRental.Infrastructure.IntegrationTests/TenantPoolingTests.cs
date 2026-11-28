@@ -68,7 +68,10 @@ public class TenantPoolingTests : IClassFixture<TenantTestDatabase>
         (int pid, IReadOnlyList<VehicleDto> list) first = await _db.RunAsTenantAsync(services, a, async p => (await BackendPidAsync(p), await ListAsync(p)));
         (int pid, IReadOnlyList<VehicleDto> list) second = await _db.RunAsTenantAsync(services, b, async p => (await BackendPidAsync(p), await ListAsync(p)));
 
-        Assert.Equal(first.pid, second.pid); // the very same physical connection
+        // A precondition, not the security assertion: with a pool of one, both companies must have been served by the very
+        // same physical connection, or the test proves nothing about leaks across reuse. Nothing else may clear this pool
+        // (see OwnedConnectionPools), so a failure here means the reuse premise broke, not that a tenant leaked.
+        Assert.True(first.pid == second.pid, $"Expected one physical connection to serve both companies, got backends {first.pid} and {second.pid}.");
         Assert.Equal(3, first.list.Count);
         Assert.All(first.list, v => Assert.StartsWith("AA-", v.RegistrationNumber, StringComparison.Ordinal));
         Assert.Equal(5, second.list.Count);
